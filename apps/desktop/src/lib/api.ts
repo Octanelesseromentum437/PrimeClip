@@ -93,6 +93,14 @@ export async function uploadVideo(file: File, onProgress?: (pct: number) => void
   return resp.json();
 }
 
+export async function uploadVideoPath(path: string): Promise<UploadResponse> {
+  return request<UploadResponse>("/api/upload/local", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+}
+
 export async function generateClips(
   videoId: string,
   provider: ProviderConfig,
