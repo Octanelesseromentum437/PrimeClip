@@ -22,7 +22,7 @@ pub fn get_api_key(kind: &str) -> Result<Option<String>, String> {
 
 pub fn delete_api_key(kind: &str) -> Result<(), String> {
     let entry = Entry::new(SERVICE, kind).map_err(|e| e.to_string())?;
-    match entry.delete_password() {
+    match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
