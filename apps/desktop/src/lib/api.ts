@@ -7,10 +7,30 @@ import type {
   UploadResponse,
 } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8765";
+const DEFAULT_API_BASE = "http://127.0.0.1:8765";
+
+let apiBasePromise: Promise<string> | null = null;
+
+export async function resolveApiBase(): Promise<string> {
+  if (!apiBasePromise) {
+    apiBasePromise = (async () => {
+      if (import.meta.env.VITE_API_BASE_URL) {
+        return import.meta.env.VITE_API_BASE_URL;
+      }
+      try {
+        const { getApiBaseUrl } = await import("./credentials");
+        return await getApiBaseUrl();
+      } catch {
+        return DEFAULT_API_BASE;
+      }
+    })();
+  }
+  return apiBasePromise;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(`${API_BASE}${path}`, init);
+  const base = await resolveApiBase();
+  const resp = await fetch(`${base}${path}`, init);
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(text || resp.statusText);
@@ -19,7 +39,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function getApiBase(): string {
-  return API_BASE;
+  return import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE;
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
@@ -44,9 +64,10 @@ export async function testProvider(config: ProviderConfig) {
 }
 
 export async function uploadVideo(file: File, onProgress?: (pct: number) => void): Promise<UploadResponse> {
+  const base = await resolveApiBase();
   const form = new FormData();
   form.append("file", file);
-  const resp = await fetch(`${API_BASE}/api/upload`, { method: "POST", body: form });
+  const resp = await fetch(`${base}/api/upload`, { method: "POST", body: form });
   if (!resp.ok) throw new Error(await resp.text());
   onProgress?.(100);
   return resp.json();
@@ -74,6 +95,7 @@ export async function fetchClips(videoId: string): Promise<ClipRecord[]> {
   return data.clips;
 }
 
-export function clipDownloadUrl(clipId: string): string {
-  return `${API_BASE}/api/download/${clipId}`;
+export async function clipDownloadUrl(clipId: string): Promise<string> {
+  const base = await resolveApiBase();
+  return `${base}/api/download/${clipId}`;
 }
