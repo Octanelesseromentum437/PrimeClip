@@ -1,0 +1,32 @@
+Find the most engaging moments with viral potential from this video transcript.
+
+Scoring criteria:
+- strong hook
+- emotional intensity
+- curiosity
+- storytelling
+- controversy
+- surprising statements
+- educational value
+- memorable quotes
+- payoff
+
+Return ONLY a JSON array. Each item must have:
+- title (string)
+- start (seconds, float)
+- end (seconds, float)
+- score (0-10, float)
+- reason (string)
+
+Clips must be 30-90 seconds long. Find up to {num_clips} clips.
+
+Video duration: {duration_sec} seconds
+Language: {language}
+
+Transcript:
+{transcript}
+
+Scenes (start/end seconds):
+{scenes}
+
+Respond with JSON array only. No markdown.
