@@ -1,4 +1,6 @@
 
+from pathlib import Path
+
 from app.infra.ffmpeg import FFmpegService
 from app.schemas.common import Resolution
 from app.schemas.crop import CropPath
@@ -13,6 +15,12 @@ class RenderService:
 
     def __init__(self, ffmpeg: FFmpegService) -> None:
         self.ffmpeg = ffmpeg
+
+    def _escape_filter_path(self, path: Path | str) -> str:
+        escaped = str(path).replace("\\", "/")
+        for char in ("\\", "'", ":", ",", "[", "]", ";"):
+            escaped = escaped.replace(char, f"\\{char}")
+        return escaped
 
     def _crop_filter(self, crop_path: CropPath) -> str:
         if not crop_path.keyframes:
@@ -35,8 +43,8 @@ class RenderService:
         duration = request.clip.end - request.clip.start
         crop = self._crop_filter(request.crop_path)
 
-        ass_path = str(request.caption_ass).replace("\\", "/").replace(":", "\\:")
-        vf = f"{crop},scale={out_w}:{out_h},ass='{ass_path}'"
+        ass_path = self._escape_filter_path(request.caption_ass)
+        vf = f"{crop},scale={out_w}:{out_h},ass={ass_path}"
 
         request.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.ffmpeg.run(
