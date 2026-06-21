@@ -2,12 +2,24 @@ from pathlib import Path
 
 import cv2
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 from app.schemas.face import FaceBBox, FaceFrame
+
+_MODEL_PATH = Path(__file__).resolve().parent / "models" / "blaze_face_short_range.tflite"
 
 
 class FaceTrackingService:
     def __init__(self) -> None:
-        self._mp_face = mp.solutions.face_detection
+        if not _MODEL_PATH.is_file():
+            raise FileNotFoundError(f"Face detector model not found: {_MODEL_PATH}")
+
+        base_options = python.BaseOptions(model_asset_path=str(_MODEL_PATH))
+        self._detector_options = vision.FaceDetectorOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.VIDEO,
+            min_detection_confidence=0.5,
+        )
 
     def track(
         self,
@@ -27,27 +39,26 @@ class FaceTrackingService:
         prev_centers: dict[int, tuple[float, float]] = {}
         ema_alpha = 0.4
 
-        face_detection = self._mp_face.FaceDetection(
-            model_selection=1,
-            min_detection_confidence=0.5,
-        )
-        with face_detection as detector:
+        with vision.FaceDetector.create_from_options(self._detector_options) as detector:
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
                 if frame_idx % frame_interval == 0:
                     timestamp = frame_idx / fps
+                    height, width = frame.shape[:2]
                     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    results = detector.process(rgb)
+                    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+                    timestamp_ms = int(timestamp * 1000)
+                    results = detector.detect_for_video(mp_image, timestamp_ms)
                     faces: list[FaceBBox] = []
                     if results.detections:
                         for i, det in enumerate(results.detections):
-                            bbox = det.location_data.relative_bounding_box
-                            x = max(0.0, bbox.xmin)
-                            y = max(0.0, bbox.ymin)
-                            w = min(1.0 - x, bbox.width)
-                            h = min(1.0 - y, bbox.height)
+                            bbox = det.bounding_box
+                            x = max(0.0, bbox.origin_x / width)
+                            y = max(0.0, bbox.origin_y / height)
+                            w = min(1.0 - x, bbox.width / width)
+                            h = min(1.0 - y, bbox.height / height)
                             cx = x + w / 2
                             cy = y + h / 2
                             if i in prev_centers:
