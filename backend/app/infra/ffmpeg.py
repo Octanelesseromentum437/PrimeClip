@@ -24,22 +24,16 @@ class FFmpegService:
             raise FFmpegError(result.stderr or result.stdout or "ffmpeg failed")
         return result
 
-    def probe_duration(self, video_path: Path) -> float:
-        result = self.run(
-            [
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "json",
-                str(video_path),
-            ],
-            check=True,
-        )
-        # ffprobe is preferred but ffmpeg -i also works; use ffprobe if available
+    def _resolve_ffprobe(self) -> Path | None:
         ffprobe = self.ffmpeg.parent / ("ffprobe.exe" if self.ffmpeg.suffix else "ffprobe")
         if ffprobe.is_file():
+            return ffprobe
+        ffprobe_path = self.ffmpeg.with_name("ffprobe" + self.ffmpeg.suffix)
+        return ffprobe_path if ffprobe_path.is_file() else None
+
+    def probe_duration(self, video_path: Path) -> float:
+        ffprobe = self._resolve_ffprobe()
+        if ffprobe:
             result = subprocess.run(
                 [
                     str(ffprobe),
@@ -55,31 +49,30 @@ class FFmpegService:
                 text=True,
                 check=False,
             )
-        try:
-            data = json.loads(result.stdout)
-            return float(data["format"]["duration"])
-        except (json.JSONDecodeError, KeyError, ValueError):
-            # fallback parse from stderr duration
-            probe = subprocess.run(
-                [str(self.ffmpeg), "-i", str(video_path)],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            import re
+            if result.returncode == 0:
+                try:
+                    data = json.loads(result.stdout)
+                    return float(data["format"]["duration"])
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    pass
 
-            match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", probe.stderr)
-            if not match:
-                raise FFmpegError("Could not determine video duration") from None
-            h, m, s = match.groups()
-            return int(h) * 3600 + int(m) * 60 + float(s)
+        probe = subprocess.run(
+            [str(self.ffmpeg), "-i", str(video_path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        import re
+
+        match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", probe.stderr)
+        if not match:
+            raise FFmpegError("Could not determine video duration") from None
+        h, m, s = match.groups()
+        return int(h) * 3600 + int(m) * 60 + float(s)
 
     def probe_dimensions(self, video_path: Path) -> tuple[int, int]:
-        ffprobe = self.ffmpeg.parent / ("ffprobe.exe" if self.ffmpeg.suffix else "ffprobe")
-        if not ffprobe.is_file():
-            ffprobe_path = self.ffmpeg.with_name("ffprobe" + self.ffmpeg.suffix)
-            ffprobe = ffprobe_path if ffprobe_path.is_file() else None
-        if ffprobe and ffprobe.is_file():
+        ffprobe = self._resolve_ffprobe()
+        if ffprobe:
             result = subprocess.run(
                 [
                     str(ffprobe),
