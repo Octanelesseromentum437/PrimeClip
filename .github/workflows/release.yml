@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-matrix:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            variant: lite
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            variant: full
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            variant: lite
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            variant: lite
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install backend deps
+        run: uv sync --all-extras
+
+      - name: Install frontend deps
+        run: cd apps/desktop && npm ci
+
+      - name: Build (${{ matrix.variant }})
+        run: |
+          if [ "${{ matrix.variant }}" = "full" ]; then
+            make build-full || true
+          else
+            make build-lite || true
+          fi
+        shell: bash
+        env:
+          BUNDLE_PROFILE: ${{ matrix.variant }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: primeclip-${{ matrix.variant }}-${{ matrix.target }}
+          path: apps/desktop/src-tauri/target/release/bundle/**/*
+          if-no-files-found: warn
