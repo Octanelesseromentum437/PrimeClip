@@ -11,7 +11,15 @@ check() {
   fi
 }
 
-check "FFmpeg" ffmpeg
+if command -v ffmpeg >/dev/null 2>&1; then
+  if ffmpeg -h filter=ass 2>&1 | grep -q "Unknown filter"; then
+    echo "✗ FFmpeg (missing libass — brew install ffmpeg-full on macOS)"
+  else
+    echo "✓ FFmpeg (with libass)"
+  fi
+else
+  echo "✗ FFmpeg (missing: ffmpeg)"
+fi
 check "Node" node
 check "uv" uv
 check "cargo" cargo
