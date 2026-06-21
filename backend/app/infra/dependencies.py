@@ -1,5 +1,6 @@
 import platform
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,6 +8,11 @@ import httpx
 from app.config import Settings
 from app.schemas.common import BundleProfile
 from app.schemas.dependencies import DependencyReport, DependencyStatus
+
+FFMPEG_FULL_HINT = (
+    "FFmpeg is missing the ass/subtitles filter (libass). "
+    "On macOS: brew install ffmpeg-full"
+)
 
 
 class DependencyResolver:
@@ -28,6 +34,34 @@ class DependencyResolver:
         candidate = base / name
         return candidate if candidate.is_file() else None
 
+    def _ffmpeg_has_ass_filter(self, ffmpeg: Path) -> bool:
+        result = subprocess.run(
+            [str(ffmpeg), "-h", "filter=ass"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.returncode == 0 and "Unknown filter" not in (result.stdout + result.stderr)
+
+    def _system_ffmpeg_candidates(self) -> list[Path]:
+        candidates: list[Path] = []
+        seen: set[str] = set()
+
+        def add(candidate: Path | str | None) -> None:
+            if not candidate:
+                return
+            path = Path(candidate)
+            key = str(path.resolve())
+            if path.is_file() and key not in seen:
+                seen.add(key)
+                candidates.append(path)
+
+        add(shutil.which("ffmpeg"))
+        for prefix in ("/opt/homebrew/opt", "/usr/local/opt"):
+            add(f"{prefix}/ffmpeg-full/bin/ffmpeg")
+            add(f"{prefix}/ffmpeg@7/bin/ffmpeg")
+        return candidates
+
     def resolve_ffmpeg(self) -> Path:
         if self.profile == BundleProfile.FULL:
             bundled = self._bundled_ffmpeg()
@@ -37,12 +71,18 @@ class DependencyResolver:
             path = Path(self.settings.ffmpeg_path)
             if path.is_file():
                 return path
-        found = shutil.which("ffmpeg")
-        if found:
-            return Path(found)
-        raise FileNotFoundError(
-            "FFmpeg not found. Install FFmpeg or set FFMPEG_PATH in Settings."
-        )
+            raise FileNotFoundError(f"FFmpeg not found at {path}")
+
+        candidates = self._system_ffmpeg_candidates()
+        if not candidates:
+            raise FileNotFoundError(
+                "FFmpeg not found. Install FFmpeg or set FFMPEG_PATH in Settings."
+            )
+
+        for candidate in candidates:
+            if self._ffmpeg_has_ass_filter(candidate):
+                return candidate
+        return candidates[0]
 
     def resolve_whisper_model(self) -> str:
         if self.profile == BundleProfile.FULL:
@@ -57,6 +97,14 @@ class DependencyResolver:
     def check_ffmpeg(self) -> DependencyStatus:
         try:
             path = self.resolve_ffmpeg()
+            if not self._ffmpeg_has_ass_filter(path):
+                return DependencyStatus(
+                    name="ffmpeg",
+                    ok=False,
+                    path=str(path),
+                    message=FFMPEG_FULL_HINT,
+                    install_url="https://formulae.brew.sh/formula/ffmpeg-full",
+                )
             return DependencyStatus(name="ffmpeg", ok=True, path=str(path))
         except FileNotFoundError as exc:
             return DependencyStatus(
