@@ -30,12 +30,27 @@ export async function resolveApiBase(): Promise<string> {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const base = await resolveApiBase();
-  const resp = await fetch(`${base}${path}`, init);
+  let resp: Response;
+  try {
+    resp = await fetch(`${base}${path}`, init);
+  } catch (err) {
+    throw new Error(formatFetchError(err));
+  }
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(text || resp.statusText);
   }
   return resp.json() as Promise<T>;
+}
+
+function formatFetchError(err: unknown): string {
+  if (err instanceof TypeError) {
+    const message = err.message.toLowerCase();
+    if (message.includes("load failed") || message.includes("failed to fetch")) {
+      return "Could not reach the PrimeClip API. Run `make dev-api` in another terminal.";
+    }
+  }
+  return err instanceof Error ? err.message : "Network request failed";
 }
 
 export function getApiBase(): string {
@@ -67,7 +82,12 @@ export async function uploadVideo(file: File, onProgress?: (pct: number) => void
   const base = await resolveApiBase();
   const form = new FormData();
   form.append("file", file);
-  const resp = await fetch(`${base}/api/upload`, { method: "POST", body: form });
+  let resp: Response;
+  try {
+    resp = await fetch(`${base}/api/upload`, { method: "POST", body: form });
+  } catch (err) {
+    throw new Error(formatFetchError(err));
+  }
   if (!resp.ok) throw new Error(await resp.text());
   onProgress?.(100);
   return resp.json();
