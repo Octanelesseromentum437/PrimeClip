@@ -83,6 +83,17 @@ class ProviderRegistry:
                         )
                     )
                     desc.models = models
+                    if models:
+                        preferred = next(
+                            (m for m in models if m == desc.default_model),
+                            None,
+                        )
+                        if preferred is None:
+                            preferred = next(
+                                (m for m in models if m.startswith(desc.default_model)),
+                                None,
+                            )
+                        desc.default_model = preferred or models[0]
                 desc.configured = health.ok
             else:
                 desc.configured = desc.kind in configured_kinds
