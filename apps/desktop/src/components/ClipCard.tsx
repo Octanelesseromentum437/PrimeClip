@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { clipDownloadUrl } from "../lib/api";
 import type { ClipRecord } from "../lib/types";
 
@@ -6,7 +7,11 @@ interface Props {
 }
 
 export function ClipCard({ clip }: Props) {
-  const downloadUrl = clipDownloadUrl(clip.id);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    clipDownloadUrl(clip.id).then(setDownloadUrl);
+  }, [clip.id]);
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 flex flex-col gap-3">
@@ -18,7 +23,7 @@ export function ClipCard({ clip }: Props) {
       <p className="text-xs text-slate-500">
         {clip.start_sec.toFixed(0)}s – {clip.end_sec.toFixed(0)}s · {clip.status}
       </p>
-      {clip.status === "ready" && (
+      {clip.status === "ready" && downloadUrl && (
         <div className="flex gap-2 mt-auto">
           <video
             src={downloadUrl}
@@ -27,7 +32,7 @@ export function ClipCard({ clip }: Props) {
           />
         </div>
       )}
-      {clip.status === "ready" && (
+      {clip.status === "ready" && downloadUrl && (
         <a
           href={downloadUrl}
           download
