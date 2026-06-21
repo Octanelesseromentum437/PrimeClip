@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Nav } from "../components/Nav";
-import { generateClips, uploadVideo } from "../lib/api";
+import { generateClips, uploadVideo, uploadVideoPath } from "../lib/api";
 import { getApiKey } from "../lib/credentials";
 import { loadProviders, resolveModelForProvider } from "../lib/providers";
+import { isTauriApp, pickVideoFile } from "../lib/tauri";
 import type { ProviderDescriptor, ProviderKind } from "../lib/types";
 
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
@@ -11,6 +12,7 @@ const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 export function UploadPage() {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
+  const [localPath, setLocalPath] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providersError, setProvidersError] = useState<string | null>(null);
   const [providersLoading, setProvidersLoading] = useState(true);
@@ -61,15 +63,37 @@ export function UploadPage() {
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
+    if (f) {
+      setFile(f);
+      setLocalPath(null);
+    }
   }, []);
 
+  const onBrowse = useCallback(async () => {
+    if (isTauriApp()) {
+      try {
+        const path = await pickVideoFile();
+        if (path) {
+          setLocalPath(path);
+          setFile(null);
+          setError(null);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not open file picker");
+      }
+      return;
+    }
+    document.getElementById("video-file-input")?.click();
+  }, []);
+
+  const selectedLabel = localPath?.split(/[/\\]/).pop() ?? file?.name ?? null;
+
   const handleGenerate = async () => {
-    if (!file) return;
+    if (!file && !localPath) return;
     setUploading(true);
     setError(null);
     try {
-      const upload = await uploadVideo(file);
+      const upload = localPath ? await uploadVideoPath(localPath) : await uploadVideo(file!);
       const apiKey = selected?.requires_api_key ? await getApiKey(kind) : null;
       const { job_id } = await generateClips(
         upload.video_id,
@@ -100,17 +124,32 @@ export function UploadPage() {
           onDrop={onDrop}
           className="border-2 border-dashed border-slate-700 rounded-xl p-12 text-center hover:border-brand-500 transition-colors"
         >
-          {file ? (
-            <p>{file.name}</p>
+          {selectedLabel ? (
+            <p>{selectedLabel}</p>
           ) : (
             <p className="text-slate-400">Drag & drop a video, or</p>
           )}
-          <input
-            type="file"
-            accept="video/*"
-            className="mt-4 text-sm"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
+          {isTauriApp() ? (
+            <button
+              type="button"
+              onClick={onBrowse}
+              className="mt-4 text-sm text-brand-400 hover:text-brand-300 underline underline-offset-2"
+            >
+              Choose video file
+            </button>
+          ) : (
+            <input
+              id="video-file-input"
+              type="file"
+              accept="video/*"
+              className="mt-4 text-sm"
+              onChange={(e) => {
+                const next = e.target.files?.[0] || null;
+                setFile(next);
+                setLocalPath(null);
+              }}
+            />
+          )}
         </div>
 
         <div className="space-y-4">
@@ -199,7 +238,7 @@ export function UploadPage() {
 
         <button
           onClick={handleGenerate}
-          disabled={!file || uploading || providersLoading}
+          disabled={(!file && !localPath) || uploading || providersLoading}
           className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 font-semibold"
         >
           {uploading ? "Processing..." : "Generate Clips"}
