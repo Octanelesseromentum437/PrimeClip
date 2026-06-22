@@ -60,11 +60,12 @@ impl Drop for SidecarManager {
 }
 
 pub fn wait_for_api(base_url: &str) -> bool {
-    for _ in 0..30 {
+    // PyInstaller onefile sidecar can take 30–60s on first launch (extract + heavy imports).
+    for _ in 0..120 {
         if health_check(base_url).is_ok() {
             return true;
         }
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
     }
     false
 }
