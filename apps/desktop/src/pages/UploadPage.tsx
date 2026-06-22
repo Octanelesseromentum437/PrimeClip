@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 import { Nav } from "../components/Nav";
 import {
   exchangeDriveCode,
   fetchDriveAuthUrl,
   fetchDriveFiles,
   fetchImportStatus,
+  fetchVideo,
   generateClips,
   importFromUrl,
   uploadFromDrive,
@@ -18,22 +20,29 @@ import {
   getGoogleAccessToken,
   storeGoogleTokens,
 } from "../lib/credentials";
+import { useLocale } from "../lib/i18n";
 import { loadProviders, resolveModelForProvider } from "../lib/providers";
-import { isTauriApp, pickVideoFile } from "../lib/tauri";
+import { isTauriApp, openFileFolder, pickVideoFile } from "../lib/tauri";
+import {
+  loadUploadSession,
+  patchUploadSession,
+  type SourceTab,
+} from "../lib/uploadSession";
 import type { ProviderDescriptor, ProviderKind, UploadResponse } from "../lib/types";
 
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 
-type SourceTab = "file" | "url" | "drive";
-
 export function UploadPage() {
   const navigate = useNavigate();
-  const [sourceTab, setSourceTab] = useState<SourceTab>("file");
+  const { t, locale } = useLocale();
+  const session = loadUploadSession();
+
+  const [sourceTab, setSourceTab] = useState<SourceTab>(session.sourceTab);
   const [file, setFile] = useState<File | null>(null);
   const [localPath, setLocalPath] = useState<string | null>(null);
-  const [importUrl, setImportUrl] = useState("");
+  const [importUrl, setImportUrl] = useState(session.importUrl);
   const [importProgress, setImportProgress] = useState<number | null>(null);
-  const [readyVideo, setReadyVideo] = useState<UploadResponse | null>(null);
+  const [readyVideo, setReadyVideo] = useState<UploadResponse | null>(session.readyVideo);
   const [driveToken, setDriveToken] = useState<string | null>(null);
   const [driveFiles, setDriveFiles] = useState<
     { id: string; name: string; mime_type: string; size: number | null }[]
@@ -48,6 +57,7 @@ export function UploadPage() {
   const [numClips, setNumClips] = useState(5);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const importPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshProviders = useCallback(async () => {
     setProvidersLoading(true);
@@ -118,6 +128,49 @@ export function UploadPage() {
     getGoogleAccessToken().then(setDriveToken);
   }, [refreshProviders]);
 
+  // Resume URL import if one was in progress
+  useEffect(() => {
+    const pendingImportId = loadUploadSession().importId;
+    if (!pendingImportId) return;
+
+    setUploading(true);
+    setImportProgress(0);
+
+    const poll = async () => {
+      try {
+        const status = await fetchImportStatus(pendingImportId);
+        setImportProgress(status.progress_pct);
+        if (status.status === "completed" && status.video_id) {
+          const video: UploadResponse = {
+            video_id: status.video_id,
+            filename: status.filename ?? "imported video",
+            duration_sec: 0,
+          };
+          setReadyVideo(video);
+          patchUploadSession({ importId: null, readyVideo: video });
+          setUploading(false);
+          setImportProgress(null);
+          void sendNotification({ title: "PrimeClip", body: t("notify.importComplete") });
+          if (importPollRef.current) clearInterval(importPollRef.current);
+        } else if (status.status === "failed") {
+          setError(status.error_message ?? "Import failed");
+          patchUploadSession({ importId: null });
+          setUploading(false);
+          setImportProgress(null);
+          if (importPollRef.current) clearInterval(importPollRef.current);
+        }
+      } catch {
+        // keep polling
+      }
+    };
+
+    poll();
+    importPollRef.current = setInterval(poll, 1000);
+    return () => {
+      if (importPollRef.current) clearInterval(importPollRef.current);
+    };
+  }, [t]);
+
   const startDriveAuth = async () => {
     try {
       const url = await fetchDriveAuthUrl();
@@ -152,26 +205,41 @@ export function UploadPage() {
     }
   };
 
+  const handleOpenFolder = async (videoId: string) => {
+    try {
+      const detail = await fetchVideo(videoId);
+      await openFileFolder(detail.source_path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open folder");
+    }
+  };
+
   const handleUrlImport = async () => {
     if (!importUrl.trim()) return;
     setUploading(true);
     setError(null);
     setImportProgress(0);
+    patchUploadSession({ importUrl: importUrl.trim(), sourceTab: "url" });
     try {
       const { import_id } = await importFromUrl(importUrl.trim());
+      patchUploadSession({ importId: import_id });
       for (;;) {
         await new Promise((r) => setTimeout(r, 1000));
         const status = await fetchImportStatus(import_id);
         setImportProgress(status.progress_pct);
         if (status.status === "completed" && status.video_id) {
-          setReadyVideo({
+          const video: UploadResponse = {
             video_id: status.video_id,
             filename: status.filename ?? "imported video",
             duration_sec: 0,
-          });
+          };
+          setReadyVideo(video);
+          patchUploadSession({ importId: null, readyVideo: video });
+          void sendNotification({ title: "PrimeClip", body: t("notify.importComplete") });
           break;
         }
         if (status.status === "failed") {
+          patchUploadSession({ importId: null });
           throw new Error(status.error_message ?? "Import failed");
         }
       }
@@ -187,8 +255,8 @@ export function UploadPage() {
     if (readyVideo && sourceTab !== "file") return readyVideo;
     if (sourceTab === "drive") {
       if (!driveToken || !selectedDriveFileId) throw new Error("Select a Google Drive file");
-      const selected = driveFiles.find((f) => f.id === selectedDriveFileId);
-      return uploadFromDrive(selectedDriveFileId, selected?.name ?? "source.mp4", driveToken);
+      const selectedFile = driveFiles.find((f) => f.id === selectedDriveFileId);
+      return uploadFromDrive(selectedDriveFileId, selectedFile?.name ?? "source.mp4", driveToken);
     }
     if (localPath) return uploadVideoPath(localPath);
     if (file) return uploadVideo(file);
@@ -209,6 +277,7 @@ export function UploadPage() {
     try {
       const upload = await resolveUpload();
       const apiKey = selected?.requires_api_key ? await getApiKey(kind) : null;
+      const whisperLang = locale === "pt-BR" ? "pt" : "en";
       const { job_id } = await generateClips(
         upload.video_id,
         {
@@ -218,7 +287,12 @@ export function UploadPage() {
           base_url: kind === "ollama" ? DEFAULT_OLLAMA_URL : null,
         },
         numClips,
+        whisperLang,
       );
+      patchUploadSession({
+        activeGeneration: { videoId: upload.video_id, jobId: job_id },
+        readyVideo: null,
+      });
       navigate(`/results/${upload.video_id}?job=${job_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -227,72 +301,82 @@ export function UploadPage() {
     }
   };
 
+  const handleTabChange = (tab: SourceTab) => {
+    setSourceTab(tab);
+    patchUploadSession({ sourceTab: tab });
+  };
+
   return (
     <div className="page-shell">
       <Nav />
       <main className="max-w-2xl mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold">Generate Clips</h1>
+        <h1 className="text-2xl font-bold">{t("upload.title")}</h1>
 
         <div className="flex gap-2 text-sm">
           {(["file", "url", "drive"] as SourceTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
-              onClick={() => setSourceTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={`px-3 py-1.5 rounded-lg capitalize transition-colors ${
                 sourceTab === tab
                   ? "bg-brand-600 text-white"
                   : "bg-app-muted hover:bg-app-muted-hover"
               }`}
             >
-              {tab === "file" ? "Local file" : tab === "url" ? "URL" : "Google Drive"}
+              {tab === "file"
+                ? t("upload.tab.file")
+                : tab === "url"
+                  ? t("upload.tab.url")
+                  : t("upload.tab.drive")}
             </button>
           ))}
         </div>
 
         {sourceTab === "file" && (
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          className="border-2 border-dashed border-app-border rounded-xl p-12 text-center hover:border-brand-500 transition-colors"
-        >
-          {(localPath?.split(/[/\\]/).pop() ?? file?.name) ? (
-            <p>{localPath?.split(/[/\\]/).pop() ?? file?.name}</p>
-          ) : (
-            <p className="text-muted">Drag & drop a video, or</p>
-          )}
-          {isTauriApp() ? (
-            <button
-              type="button"
-              onClick={onBrowse}
-              className="mt-4 text-sm link-brand underline underline-offset-2"
-            >
-              Choose video file
-            </button>
-          ) : (
-            <input
-              id="video-file-input"
-              type="file"
-              accept="video/*"
-              className="mt-4 text-sm"
-              onChange={(e) => {
-                const next = e.target.files?.[0] || null;
-                setFile(next);
-                setLocalPath(null);
-              }}
-            />
-          )}
-        </div>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            className="border-2 border-dashed border-app-border rounded-xl p-12 text-center hover:border-brand-500 transition-colors"
+          >
+            {(localPath?.split(/[/\\]/).pop() ?? file?.name) ? (
+              <p>{localPath?.split(/[/\\]/).pop() ?? file?.name}</p>
+            ) : (
+              <p className="text-muted">{t("upload.drop")}</p>
+            )}
+            {isTauriApp() ? (
+              <button
+                type="button"
+                onClick={onBrowse}
+                className="mt-4 text-sm link-brand underline underline-offset-2"
+              >
+                {t("upload.choose")}
+              </button>
+            ) : (
+              <input
+                id="video-file-input"
+                type="file"
+                accept="video/*"
+                className="mt-4 text-sm"
+                onChange={(e) => {
+                  const next = e.target.files?.[0] || null;
+                  setFile(next);
+                  setLocalPath(null);
+                }}
+              />
+            )}
+          </div>
         )}
 
         {sourceTab === "url" && (
           <div className="card p-6 space-y-4">
-            <p className="text-sm text-muted">
-              Paste a public YouTube, Vimeo, or Google Drive link. Respect copyright and platform terms.
-            </p>
+            <p className="text-sm text-muted">{t("upload.url.hint")}</p>
             <input
               value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
+              onChange={(e) => {
+                setImportUrl(e.target.value);
+                patchUploadSession({ importUrl: e.target.value });
+              }}
               placeholder="https://www.youtube.com/watch?v=..."
               className="input p-3"
             />
@@ -302,10 +386,26 @@ export function UploadPage() {
               disabled={uploading || !importUrl.trim()}
               className="w-full btn-secondary"
             >
-              {uploading ? `Downloading… ${importProgress ?? 0}%` : "Download video"}
+              {uploading
+                ? `${t("upload.url.downloading")} ${importProgress ?? 0}%`
+                : t("upload.url.download")}
             </button>
             {readyVideo && (
-              <p className="text-success">Ready: {readyVideo.filename}</p>
+              <p className="text-success">
+                {t("upload.url.ready")}:{" "}
+                {isTauriApp() ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenFolder(readyVideo.video_id)}
+                    className="underline underline-offset-2 hover:opacity-80"
+                    title={t("upload.url.openFolder")}
+                  >
+                    {readyVideo.filename}
+                  </button>
+                ) : (
+                  readyVideo.filename
+                )}
+              </p>
             )}
           </div>
         )}
@@ -375,7 +475,7 @@ export function UploadPage() {
 
         <div className="space-y-4">
           <label className="block">
-            <span className="label-muted">LLM Provider</span>
+            <span className="label-muted">{t("upload.llm")}</span>
             <select
               value={kind}
               disabled={providersLoading || providers.length === 0}
@@ -393,7 +493,7 @@ export function UploadPage() {
           </label>
 
           {providersLoading && (
-            <p className="text-sm text-app-fg-subtle">Loading providers…</p>
+            <p className="text-sm text-app-fg-subtle">{t("upload.loadingProviders")}</p>
           )}
 
           {providersError && (
@@ -411,13 +511,13 @@ export function UploadPage() {
 
           {selected?.requires_api_key && !selected.configured && (
             <p className="text-sm text-amber-600 dark:text-amber-300">
-              This provider needs an API key. Add it in Settings before generating clips.
+              {t("upload.apiKeyHint")}
             </p>
           )}
 
           {modelOptions.length ? (
             <label className="block">
-              <span className="label-muted">Model</span>
+              <span className="label-muted">{t("upload.model")}</span>
               <select
                 value={modelValue}
                 onChange={(e) => setModel(e.target.value)}
@@ -432,7 +532,7 @@ export function UploadPage() {
             </label>
           ) : (
             <label className="block">
-              <span className="label-muted">Model</span>
+              <span className="label-muted">{t("upload.model")}</span>
               <input
                 value={modelValue}
                 onChange={(e) => setModel(e.target.value)}
@@ -443,7 +543,9 @@ export function UploadPage() {
           )}
 
           <label className="block">
-            <span className="label-muted">Number of clips: {numClips}</span>
+            <span className="label-muted">
+              {t("upload.clips")}: {numClips}
+            </span>
             <input
               type="range"
               min={1}
@@ -462,7 +564,7 @@ export function UploadPage() {
           disabled={!canGenerate || uploading || providersLoading}
           className="w-full py-3 rounded-xl btn-primary"
         >
-          {uploading ? "Processing..." : "Generate Clips"}
+          {uploading ? t("upload.processing") : t("upload.generate")}
         </button>
       </main>
     </div>
