@@ -8,7 +8,7 @@ export function useJobPolling(jobId: string | null, enabled: boolean) {
     enabled: enabled && !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      if (status === "completed" || status === "failed") return false;
+      if (status === "completed" || status === "failed" || status === "cancelled") return false;
       return 2000;
     },
   });
