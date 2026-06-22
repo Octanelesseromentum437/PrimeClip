@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { ActiveUploadBanner } from "./components/ActiveUploadBanner";
 import { GlobalJobMonitor } from "./components/GlobalJobMonitor";
+import { MenuBridge } from "./components/MenuBridge";
 import { syncIconShapeFromStorage } from "./lib/iconShape";
 import { LocaleProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
@@ -21,6 +22,7 @@ export default function App() {
       <LocaleProvider>
         <GlobalJobMonitor />
         <BrowserRouter>
+          <MenuBridge />
           <ActiveUploadBanner />
           <Routes>
             <Route path="/" element={<UploadPage />} />

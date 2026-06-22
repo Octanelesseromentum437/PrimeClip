@@ -1,6 +1,7 @@
 mod app_info;
 mod credentials;
 mod icon_shape;
+mod menu;
 mod sidecar;
 mod state;
 
@@ -43,6 +44,9 @@ fn main() {
                 api_base_url: base_url,
             });
             app.manage(manager);
+
+            menu::setup_menu(app)?;
+            menu::attach_menu_handlers(app.handle());
 
             Ok(())
         })
