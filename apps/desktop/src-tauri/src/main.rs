@@ -1,7 +1,9 @@
 mod credentials;
+mod icon_shape;
 mod sidecar;
 mod state;
 
+use icon_shape::set_icon_shape;
 use credentials::{
     delete_api_key_cmd, delete_google_tokens_cmd, get_api_base_url, get_api_key_cmd,
     get_bundle_profile, get_google_access_token_cmd, list_configured_providers_cmd,
@@ -53,6 +55,7 @@ fn main() {
             get_api_base_url,
             get_bundle_profile,
             open_output_folder,
+            set_icon_shape,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
