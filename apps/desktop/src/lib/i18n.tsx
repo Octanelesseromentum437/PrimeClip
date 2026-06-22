@@ -39,6 +39,9 @@ const translations = {
     "results.noClips": "No clips generated.",
     "results.noClipsHint":
       "The AI did not find valid clip windows. Try again with a different provider or check the transcript.",
+    "results.cancel": "Cancel generation",
+    "results.cancelling": "Cancelling…",
+    "results.cancelled": "Generation was cancelled.",
     "progress.title": "Pipeline progress",
     "progress.expand": "Show steps",
     "progress.collapse": "Hide steps",
@@ -95,6 +98,9 @@ const translations = {
     "results.noClips": "Nenhum clipe gerado.",
     "results.noClipsHint":
       "A IA não encontrou janelas válidas. Tente novamente com outro provedor ou verifique a transcrição.",
+    "results.cancel": "Cancelar geração",
+    "results.cancelling": "Cancelando…",
+    "results.cancelled": "A geração foi cancelada.",
     "progress.title": "Progresso do pipeline",
     "progress.expand": "Ver etapas",
     "progress.collapse": "Ocultar etapas",
