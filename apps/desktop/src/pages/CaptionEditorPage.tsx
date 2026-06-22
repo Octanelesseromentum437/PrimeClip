@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Nav } from "../components/Nav";
-import { VideoPreview, type VideoAspect } from "../components/VideoPreview";
+import { CaptionTimeline } from "../components/editor/CaptionTimeline";
+import {
+  EditorPlayer,
+  type EditorPlayerHandle,
+  type VideoAspect,
+} from "../components/editor/EditorPlayer";
 import {
   clipPreviewUrl,
+  clipThumbnailUrl,
   fetchCaptions,
   fetchClipQualities,
   fetchSystemFonts,
@@ -25,16 +30,26 @@ const FALLBACK_FONTS = ["Impact", "Arial", "Helvetica", "Georgia", "Verdana"];
 export function CaptionEditorPage() {
   const { videoId, clipId } = useParams<{ videoId: string; clipId: string }>();
   const navigate = useNavigate();
+  const playerRef = useRef<EditorPlayerHandle>(null);
+
   const [cues, setCues] = useState<CaptionCue[]>([]);
   const [style, setStyle] = useState<CaptionStyle | null>(null);
   const [activePreset, setActivePreset] = useState<CaptionStyleName | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [aspect, setAspect] = useState<VideoAspect>("9:16");
   const [fonts, setFonts] = useState<string[]>(FALLBACK_FONTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [duration, setDuration] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const currentTimeRef = useRef(0);
+
+  const getCurrentTime = useCallback(() => currentTimeRef.current, []);
 
   const load = useCallback(async () => {
     if (!clipId) return;
@@ -54,8 +69,19 @@ export function CaptionEditorPage() {
       setActivePreset(data.preset);
       setAspect(qualities.aspect_ratio === "16:9" ? "16:9" : "9:16");
       setFonts(systemFonts.length ? systemFonts : FALLBACK_FONTS);
+      setSelectedIndex(data.cues.length ? 0 : null);
+
       const resolution = qualities.resolutions[0];
-      setVideoUrl(`${await clipPreviewUrl(clipId, resolution)}?t=${Date.now()}`);
+      const [preview, thumb] = await Promise.all([
+        clipPreviewUrl(clipId, resolution),
+        clipThumbnailUrl(clipId).catch(() => null),
+      ]);
+      setVideoUrl(`${preview}?t=${Date.now()}`);
+      setThumbnailUrl(thumb ? `${thumb}?t=${Date.now()}` : null);
+
+      const fallbackDuration =
+        data.cues.length > 0 ? Math.max(...data.cues.map((c) => c.end)) : 60;
+      setDuration(fallbackDuration);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load captions");
     } finally {
@@ -67,10 +93,15 @@ export function CaptionEditorPage() {
     load();
   }, [load]);
 
-  const updateCue = (index: number, field: keyof CaptionCue, value: string | number) => {
+  const updateCue = (index: number, patch: Partial<CaptionCue>) => {
     setCues((prev) =>
-      prev.map((cue, i) => (i === index ? { ...cue, [field]: value } : cue)),
+      prev.map((cue, i) => (i === index ? { ...cue, ...patch } : cue)),
     );
+  };
+
+  const handleSeek = (time: number) => {
+    playerRef.current?.seek(time);
+    currentTimeRef.current = time;
   };
 
   const handleSave = async () => {
@@ -140,147 +171,113 @@ export function CaptionEditorPage() {
       ? [style.font_family, ...fonts]
       : fonts;
 
+  const selectedCue = selectedIndex !== null ? cues[selectedIndex] : null;
+  const effectiveDuration =
+    duration > 0
+      ? duration
+      : cues.length
+        ? Math.max(...cues.map((c) => c.end))
+        : 60;
+
   if (loading) {
     return (
-      <div className="h-screen flex flex-col bg-app-bg">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center text-app-fg-muted">
-          Loading editor…
-        </main>
+      <div className="editor-shell flex items-center justify-center">
+        <div className="text-sm text-app-fg-muted">Loading editor…</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-app-bg text-app-fg overflow-hidden">
-      <Nav />
-
-      <header className="shrink-0 flex items-center justify-between gap-4 px-4 py-2 border-b border-app-border bg-app-surface">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold truncate">Caption Editor</h1>
-          <p className="text-xs text-app-fg-subtle">{cues.length} caption cues</p>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {error && <p className="text-error max-w-xs truncate">{error}</p>}
-          <Link to={`/results/${videoId}`} className="link-brand whitespace-nowrap">
-            ← Back to results
+    <div className="editor-shell">
+      <header className="editor-toolbar" data-tauri-drag-region>
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            to={`/results/${videoId}`}
+            className="editor-toolbar-btn shrink-0"
+          >
+            ← Back
           </Link>
+          <div className="min-w-0">
+            <h1 className="text-sm font-semibold truncate">Caption Editor</h1>
+            <p className="text-[11px] text-app-fg-subtle truncate">
+              {cues.length} captions · {formatCueTime(effectiveDuration)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {error && (
+            <span className="text-xs text-red-400 max-w-[200px] truncate">{error}</span>
+          )}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="editor-toolbar-btn"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={handleRerender}
+            disabled={rendering}
+            className="editor-toolbar-btn editor-toolbar-btn-primary"
+          >
+            {rendering ? "Exporting…" : "Export clip"}
+          </button>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-        <aside className="lg:w-72 xl:w-80 shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-app-border bg-app-surface-muted p-3 lg:p-4 min-h-0 max-h-[45vh] lg:max-h-none">
-          <p className="shrink-0 text-xs font-medium uppercase tracking-wide text-app-fg-subtle mb-2">
-            Preview
-          </p>
-          <div className="flex-1 flex items-center justify-center min-h-0">
-            <div className="h-full max-h-full w-auto max-w-full">
-              <VideoPreview
-                src={videoUrl}
-                aspect={aspect}
-                cues={cues}
-                style={style}
-                error={error}
-              />
+      <div className="editor-workspace">
+        <div className="editor-stage">
+          <EditorPlayer
+            ref={playerRef}
+            src={videoUrl}
+            poster={thumbnailUrl}
+            aspect={aspect}
+            cues={cues}
+            style={style}
+            onTimeUpdate={(t) => {
+              currentTimeRef.current = t;
+            }}
+            onDurationChange={(d) => setDuration(d)}
+            onPlayStateChange={setPlaying}
+          />
+        </div>
+
+        <aside className="editor-inspector">
+          <div className="editor-inspector-section">
+            <p className="editor-inspector-label">Presets</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handlePreset(p.id)}
+                  disabled={saving}
+                  className={
+                    activePreset === p.id
+                      ? "editor-preset editor-preset-active"
+                      : "editor-preset"
+                  }
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
-        </aside>
 
-        <section className="flex-1 flex flex-col min-w-0 min-h-0">
-          <div className="panel-header">
-            <h2 className="font-medium text-sm">Captions</h2>
-            <span className="text-xs text-app-fg-subtle">Edit text and timing</span>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-2">
-            {cues.map((cue, index) => (
-              <div
-                key={index}
-                className="rounded-lg border border-app-border bg-app-surface p-3 space-y-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-app-fg-subtle">Cue {index + 1}</span>
-                  <span className="text-xs text-app-fg-muted tabular-nums">
-                    {formatCueTime(cue.start)} – {formatCueTime(cue.end)}
-                  </span>
-                </div>
-                <textarea
-                  value={cue.text}
-                  onChange={(e) => updateCue(index, "text", e.target.value)}
-                  rows={2}
-                  className="input resize-none"
-                  placeholder="Caption text…"
-                />
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <label>
-                    <span className="label-xs">Start</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      defaultValue={formatCueTime(cue.start)}
-                      key={`${index}-start-${formatCueTime(cue.start)}`}
-                      onBlur={(e) => {
-                        const parsed = parseCueTime(e.target.value);
-                        if (parsed !== null) updateCue(index, "start", parsed);
-                      }}
-                      className="input-sm mt-1 font-mono"
-                      placeholder="0:00.0"
-                    />
-                  </label>
-                  <label>
-                    <span className="label-xs">End</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      defaultValue={formatCueTime(cue.end)}
-                      key={`${index}-end-${formatCueTime(cue.end)}`}
-                      onBlur={(e) => {
-                        const parsed = parseCueTime(e.target.value);
-                        if (parsed !== null) updateCue(index, "end", parsed);
-                      }}
-                      className="input-sm mt-1 font-mono"
-                      placeholder="0:00.0"
-                    />
-                  </label>
-                </div>
-              </div>
-            ))}
-            {cues.length === 0 && (
-              <p className="text-sm text-app-fg-muted text-center py-8">No captions yet.</p>
-            )}
-          </div>
-        </section>
-
-        <aside className="lg:w-72 xl:w-80 shrink-0 flex flex-col border-t lg:border-t-0 lg:border-l border-app-border bg-app-surface min-h-0 max-h-[50vh] lg:max-h-none">
-          <div className="panel-header">
-            <h2 className="font-medium text-sm">Style</h2>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-4 min-h-0">
-            <div>
-              <p className="label-xs mb-2">Presets</p>
-              <div className="grid grid-cols-2 gap-2">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => handlePreset(p.id)}
-                    disabled={saving}
-                    className={activePreset === p.id ? "chip-active" : "chip"}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {style && (
-              <div className="space-y-3">
-                <label className="block">
-                  <span className="label-xs">Font</span>
+          {style && (
+            <>
+              <div className="editor-inspector-section">
+                <label className="editor-inspector-label">
+                  Font
                   <select
                     value={style.font_family}
-                    onChange={(e) => setStyle({ ...style, font_family: e.target.value })}
-                    className="input mt-1"
+                    onChange={(e) =>
+                      setStyle({ ...style, font_family: e.target.value })
+                    }
+                    className="editor-input mt-1"
                   >
                     {fontOptions.map((f) => (
                       <option key={f} value={f}>
@@ -289,64 +286,104 @@ export function CaptionEditorPage() {
                     ))}
                   </select>
                 </label>
+              </div>
 
-                <label className="block">
-                  <span className="label-xs">Size: {style.font_size}</span>
+              <div className="editor-inspector-section">
+                <label className="editor-inspector-label">
+                  Size · {style.font_size}
                   <input
                     type="range"
                     min={40}
                     max={120}
                     value={style.font_size}
-                    onChange={(e) => setStyle({ ...style, font_size: Number(e.target.value) })}
-                    className="w-full mt-1 accent-brand-600"
+                    onChange={(e) =>
+                      setStyle({ ...style, font_size: Number(e.target.value) })
+                    }
+                    className="editor-range mt-2"
                   />
                 </label>
+              </div>
 
-                <label className="block">
-                  <span className="label-xs">Words per screen: {style.words_per_screen}</span>
+              <div className="editor-inspector-section">
+                <label className="editor-inspector-label">
+                  Words / screen · {style.words_per_screen}
                   <input
                     type="range"
                     min={1}
                     max={5}
                     value={style.words_per_screen}
                     onChange={(e) => handleWordsPerScreen(Number(e.target.value))}
-                    className="w-full mt-1 accent-brand-600"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="label-xs">Text color</span>
-                  <input
-                    type="color"
-                    value={style.primary_color}
-                    onChange={(e) => setStyle({ ...style, primary_color: e.target.value })}
-                    className="mt-1 block h-9 w-full cursor-pointer rounded border border-app-border bg-app-input"
+                    className="editor-range mt-2"
                   />
                 </label>
               </div>
-            )}
-          </div>
 
-          <footer className="shrink-0 p-3 lg:p-4 border-t border-app-border space-y-2 bg-app-surface-muted/50">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="btn-secondary w-full"
-            >
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-            <button
-              type="button"
-              onClick={handleRerender}
-              disabled={rendering}
-              className="btn-primary w-full"
-            >
-              {rendering ? "Re-rendering…" : "Re-render clip"}
-            </button>
-          </footer>
+              <div className="editor-inspector-section">
+                <label className="editor-inspector-label">
+                  Color
+                  <input
+                    type="color"
+                    value={style.primary_color}
+                    onChange={(e) =>
+                      setStyle({ ...style, primary_color: e.target.value })
+                    }
+                    className="editor-color mt-1"
+                  />
+                </label>
+              </div>
+            </>
+          )}
         </aside>
       </div>
+
+      {selectedCue && selectedIndex !== null && (
+        <div className="editor-cue-bar">
+          <div className="flex items-center gap-3 shrink-0 text-[11px] text-app-fg-subtle tabular-nums">
+            <span>#{selectedIndex + 1}</span>
+            <input
+              type="text"
+              defaultValue={formatCueTime(selectedCue.start)}
+              key={`s-${selectedIndex}-${selectedCue.start}`}
+              onBlur={(e) => {
+                const parsed = parseCueTime(e.target.value);
+                if (parsed !== null) updateCue(selectedIndex, { start: parsed });
+              }}
+              className="editor-time-input"
+              aria-label="Start time"
+            />
+            <span>→</span>
+            <input
+              type="text"
+              defaultValue={formatCueTime(selectedCue.end)}
+              key={`e-${selectedIndex}-${selectedCue.end}`}
+              onBlur={(e) => {
+                const parsed = parseCueTime(e.target.value);
+                if (parsed !== null) updateCue(selectedIndex, { end: parsed });
+              }}
+              className="editor-time-input"
+              aria-label="End time"
+            />
+          </div>
+          <input
+            type="text"
+            value={selectedCue.text}
+            onChange={(e) => updateCue(selectedIndex, { text: e.target.value })}
+            className="editor-cue-input flex-1"
+            placeholder="Caption text…"
+          />
+        </div>
+      )}
+
+      <CaptionTimeline
+        cues={cues}
+        duration={effectiveDuration}
+        getCurrentTime={getCurrentTime}
+        playing={playing}
+        selectedIndex={selectedIndex}
+        onSelect={setSelectedIndex}
+        onSeek={handleSeek}
+        onUpdateCue={updateCue}
+      />
     </div>
   );
 }
