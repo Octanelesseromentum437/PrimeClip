@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import numpy as np
-
 from app.db.models import Clip
 from app.services.media_cache import (
     _compute_peaks,

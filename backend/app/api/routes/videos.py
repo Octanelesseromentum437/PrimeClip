@@ -5,7 +5,7 @@ from app.config import get_settings
 from app.db.repository import ClipRepository, JobRepository, VideoRepository
 from app.infra.paths import resolve_storage_path
 from app.infra.storage import FileStore
-from app.schemas.video import VideoDetail, VideoSummary, VideosListResponse
+from app.schemas.video import VideoDetail, VideosListResponse, VideoSummary
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlmodel import Session

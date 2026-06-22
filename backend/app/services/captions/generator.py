@@ -1,12 +1,12 @@
 from pathlib import Path
 
 from app.schemas.caption import (
+    STYLE_PRESETS,
     CaptionEditState,
     CaptionFiles,
     CaptionStyle,
-    STYLE_PRESETS,
 )
-from app.schemas.common import CaptionStyleName, AspectRatio
+from app.schemas.common import AspectRatio, CaptionStyleName
 from app.schemas.transcript import TranscriptSegment
 from app.services.captions.ass_builder import AssBuilder
 from app.services.captions.chunker import CaptionChunker

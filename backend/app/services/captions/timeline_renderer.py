@@ -3,7 +3,7 @@ from pathlib import Path
 from app.infra.ffmpeg import FFmpegService
 from app.schemas.common import AspectRatio, Resolution, output_dimensions
 from app.schemas.crop import CropPath
-from app.schemas.timeline import AudioItem, OverlayItem, TimelineState, VideoAudioTrim, VideoTrim
+from app.schemas.timeline import TimelineState, VideoAudioTrim, VideoTrim
 
 
 class TimelineRenderService:
@@ -138,9 +138,7 @@ class TimelineRenderService:
 
         final_v = current_v if current_v != "vbase" else "vbase"
 
-        audio_input_idx = 1 + len(
-            [o for o in overlay_items if (assets_dir / o.asset).is_file()]
-        )
+        audio_input_idx = 1 + len([o for o in overlay_items if (assets_dir / o.asset).is_file()])
         audio_dur = audio_tl_end - audio_tl_start
         audio_source_end = audio_source_start + audio_dur
         audio_filters: list[str] = [
@@ -174,9 +172,7 @@ class TimelineRenderService:
             audio_input_idx += 1
 
         audio_labels = ["[orig]"] + [
-            f"[aud{i}]"
-            for i, item in enumerate(audio_items)
-            if (assets_dir / item.asset).is_file()
+            f"[aud{i}]" for i, item in enumerate(audio_items) if (assets_dir / item.asset).is_file()
         ]
         if len(audio_labels) > 1:
             audio_filters.append(

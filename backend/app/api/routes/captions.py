@@ -1,14 +1,14 @@
-from pathlib import Path
 import shutil
 import uuid
+from pathlib import Path
 
 from app.api.deps import get_db_session
 from app.api.deps_captions import get_clip_rerender_service
 from app.db.repository import ClipRepository, VideoRepository
 from app.schemas.caption import (
+    STYLE_PRESETS,
     CaptionEditPatch,
     CaptionEditResponse,
-    STYLE_PRESETS,
 )
 from app.schemas.common import CaptionStyleName, ClipStatus
 from app.services.captions.rerender import ClipRerenderService

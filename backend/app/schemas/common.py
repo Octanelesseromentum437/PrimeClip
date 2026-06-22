@@ -52,9 +52,7 @@ RESOLUTION_LABELS: dict[tuple[AspectRatio, Resolution], str] = {
 }
 
 
-def output_dimensions(
-    aspect_ratio: AspectRatio, resolution: Resolution
-) -> tuple[int, int]:
+def output_dimensions(aspect_ratio: AspectRatio, resolution: Resolution) -> tuple[int, int]:
     return RESOLUTION_DIMENSIONS[(aspect_ratio, resolution)]
 
 

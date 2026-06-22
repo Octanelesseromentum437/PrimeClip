@@ -96,9 +96,7 @@ def list_qualities(
             ],
             aspect_ratio=aspect_ratio.value,
         )
-    resolutions = available_resolution_labels(
-        video.source_width, video.source_height, aspect_ratio
-    )
+    resolutions = available_resolution_labels(video.source_width, video.source_height, aspect_ratio)
     return QualitiesResponse(resolutions=resolutions, aspect_ratio=aspect_ratio.value)
 
 

@@ -10,9 +10,9 @@ from app.infra.ffmpeg import FFmpegService
 from app.infra.storage import FileStore
 from app.pipelines.context import PipelineContext
 from app.providers.registry import ProviderRegistry
-from app.schemas.clip import ClipSelectionRequest
-from app.schemas.common import CaptionStyleName, ClipStatus, JobStatus, Resolution, AspectRatio
 from app.schemas.caption import STYLE_PRESETS
+from app.schemas.clip import ClipSelectionRequest
+from app.schemas.common import AspectRatio, ClipStatus, JobStatus, Resolution
 from app.services.audio.extract import AudioExtractService
 from app.services.captions.generator import CaptionService
 from app.services.face_tracking.mediapipe_tracker import FaceTrackingService
@@ -176,9 +176,7 @@ class ClipGenerationPipeline:
             )
             self._check_cancelled(job, session)
 
-            target_aspect = (
-                (16, 9) if ctx.aspect_ratio == AspectRatio.HORIZONTAL else (9, 16)
-            )
+            target_aspect = (16, 9) if ctx.aspect_ratio == AspectRatio.HORIZONTAL else (9, 16)
 
             # Stage 6: Render clips
             db_clips: list[Clip] = []
@@ -248,6 +246,7 @@ class ClipGenerationPipeline:
                     motion_plan = self.motion.plan(candidate, ctx.transcript)
                     output_path = output_dir / f"clip_{db_clip.index:02d}.mp4"
                     from app.schemas.common import resolution_label
+
                     preview_path = output_dir / (
                         f"clip_{db_clip.index:02d}_preview_"
                         f"{resolution_label(ctx.aspect_ratio, Resolution.HD)}.mp4"

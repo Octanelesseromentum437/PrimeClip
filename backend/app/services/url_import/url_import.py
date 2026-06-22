@@ -2,7 +2,7 @@ import asyncio
 import logging
 import re
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 

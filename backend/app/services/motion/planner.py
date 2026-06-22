@@ -13,9 +13,7 @@ class MotionService:
         rules = rules or MotionRules()
         effects: list[MotionEffect] = []
 
-        clip_segments = [
-            s for s in transcript if s.end > clip.start and s.start < clip.end
-        ]
+        clip_segments = [s for s in transcript if s.end > clip.start and s.start < clip.end]
 
         for seg in clip_segments:
             rel_start = max(0.0, seg.start - clip.start)

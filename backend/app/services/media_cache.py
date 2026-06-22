@@ -24,8 +24,7 @@ def filmstrip_path_for_clip(
 ) -> Path:
     output_dir = file_store.clips_output_dir(clip.video_id)
     return output_dir / (
-        f"clip_{clip.index:02d}_filmstrip_"
-        f"{start_sec:.2f}_{end_sec:.2f}_{frame_count}_{height}.jpg"
+        f"clip_{clip.index:02d}_filmstrip_{start_sec:.2f}_{end_sec:.2f}_{frame_count}_{height}.jpg"
     )
 
 

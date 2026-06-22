@@ -10,8 +10,7 @@ from app.schemas.common import BundleProfile
 from app.schemas.dependencies import DependencyReport, DependencyStatus
 
 FFMPEG_FULL_HINT = (
-    "FFmpeg is missing the ass/subtitles filter (libass). "
-    "On macOS: brew install ffmpeg-full"
+    "FFmpeg is missing the ass/subtitles filter (libass). On macOS: brew install ffmpeg-full"
 )
 
 

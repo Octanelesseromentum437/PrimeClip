@@ -2,7 +2,11 @@ import time
 from pathlib import Path
 
 import httpx
-from app.providers.json_utils import fallback_heuristic_clips, parse_clip_candidates, resolve_clip_candidates
+from app.providers.json_utils import (
+    fallback_heuristic_clips,
+    parse_clip_candidates,
+    resolve_clip_candidates,
+)
 from app.schemas.clip import ClipCandidate, ClipSelectionRequest
 from app.schemas.provider import ProviderConfig, ProviderHealth, ProviderKind
 from app.schemas.transcript import TranscriptSegment

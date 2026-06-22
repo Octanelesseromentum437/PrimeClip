@@ -1,7 +1,6 @@
 from app.schemas.crop import CropKeyframe, CropPath
 from app.schemas.face import FaceFrame
 
-
 HEADROOM_OFFSET = 0.12
 
 
@@ -66,9 +65,7 @@ class VerticalCropService:
             prev = kf
 
         if not keyframes:
-            keyframes.append(
-                CropKeyframe(timestamp=0.0, x=0.21, y=0.0, width=0.56, height=1.0)
-            )
+            keyframes.append(CropKeyframe(timestamp=0.0, x=0.21, y=0.0, width=0.56, height=1.0))
 
         return CropPath(
             keyframes=keyframes,
@@ -77,9 +74,7 @@ class VerticalCropService:
             target_aspect=target_aspect,
         )
 
-    def slice_for_clip(
-        self, crop_path: CropPath, start: float, end: float
-    ) -> CropPath:
+    def slice_for_clip(self, crop_path: CropPath, start: float, end: float) -> CropPath:
         keyframes = [kf for kf in crop_path.keyframes if start <= kf.timestamp <= end]
         if not keyframes:
             keyframes = crop_path.keyframes[:1] if crop_path.keyframes else []

@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.schemas.clip import ClipCandidate
+from app.schemas.common import AspectRatio, CaptionStyleName
 from app.schemas.face import FaceFrame
-from app.schemas.common import CaptionStyleName, AspectRatio
 from app.schemas.provider import ProviderConfig
 from app.schemas.scene import Scene
 from app.schemas.transcript import TranscriptSegment

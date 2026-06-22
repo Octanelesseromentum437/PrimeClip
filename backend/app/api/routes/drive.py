@@ -1,4 +1,3 @@
-from pathlib import Path
 from uuid import uuid4
 
 from app.api.deps import get_ffmpeg_service

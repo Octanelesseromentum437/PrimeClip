@@ -1,8 +1,7 @@
-
 from pathlib import Path
 
 from app.infra.ffmpeg import FFmpegService
-from app.schemas.common import AspectRatio, Resolution, output_dimensions
+from app.schemas.common import AspectRatio, output_dimensions
 from app.schemas.crop import CropPath
 from app.schemas.render import RenderRequest, RenderResult
 

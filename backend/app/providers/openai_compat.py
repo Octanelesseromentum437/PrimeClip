@@ -1,7 +1,11 @@
 import time
 
 from app.config import Settings
-from app.providers.json_utils import fallback_heuristic_clips, parse_clip_candidates, resolve_clip_candidates
+from app.providers.json_utils import (
+    fallback_heuristic_clips,
+    parse_clip_candidates,
+    resolve_clip_candidates,
+)
 from app.providers.ollama import build_clip_prompt
 from app.schemas.clip import ClipCandidate, ClipSelectionRequest
 from app.schemas.provider import ProviderConfig, ProviderHealth, ProviderKind

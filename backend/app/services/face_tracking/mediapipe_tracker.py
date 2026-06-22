@@ -2,9 +2,9 @@ from pathlib import Path
 
 import cv2
 import mediapipe as mp
+from app.schemas.face import FaceBBox, FaceFrame
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from app.schemas.face import FaceBBox, FaceFrame
 
 _MODEL_PATH = Path(__file__).resolve().parent / "models" / "blaze_face_short_range.tflite"
 
