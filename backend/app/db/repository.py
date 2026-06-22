@@ -1,5 +1,5 @@
 from app.config import Settings
-from app.db.models import AppPreferences, Clip, Job, Video
+from app.db.models import AppPreferences, Clip, ClipVariant, Job, Video
 from sqlmodel import Session, SQLModel, create_engine, select
 
 
@@ -19,6 +19,12 @@ class VideoRepository:
     def list_all(self) -> list[Video]:
         return list(self.session.exec(select(Video).order_by(Video.created_at.desc())).all())
 
+    def update(self, video: Video) -> Video:
+        self.session.add(video)
+        self.session.commit()
+        self.session.refresh(video)
+        return video
+
     def delete(self, video_id: str) -> bool:
         video = self.get(video_id)
         if video is None:
@@ -26,6 +32,40 @@ class VideoRepository:
         self.session.delete(video)
         self.session.commit()
         return True
+
+
+class ClipVariantRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get(self, clip_id: str, resolution: str) -> ClipVariant | None:
+        stmt = select(ClipVariant).where(
+            ClipVariant.clip_id == clip_id,
+            ClipVariant.resolution == resolution,
+        )
+        return self.session.exec(stmt).first()
+
+    def upsert(self, variant: ClipVariant) -> ClipVariant:
+        existing = self.get(variant.clip_id, variant.resolution)
+        if existing:
+            existing.output_path = variant.output_path
+            self.session.add(existing)
+            self.session.commit()
+            self.session.refresh(existing)
+            return existing
+        self.session.add(variant)
+        self.session.commit()
+        self.session.refresh(variant)
+        return variant
+
+    def list_for_clip(self, clip_id: str) -> list[ClipVariant]:
+        stmt = select(ClipVariant).where(ClipVariant.clip_id == clip_id)
+        return list(self.session.exec(stmt).all())
+
+    def delete_for_clip(self, clip_id: str) -> None:
+        for variant in self.list_for_clip(clip_id):
+            self.session.delete(variant)
+        self.session.commit()
 
 
 class JobRepository:
@@ -81,7 +121,9 @@ class ClipRepository:
         return len(self.list_for_video(video_id))
 
     def delete_for_video(self, video_id: str) -> None:
+        variant_repo = ClipVariantRepository(self.session)
         for clip in self.list_for_video(video_id):
+            variant_repo.delete_for_clip(clip.id)
             self.session.delete(clip)
         self.session.commit()
 
@@ -115,6 +157,24 @@ class PreferencesRepository:
         return prefs
 
 
+def _migrate_sqlite(engine) -> None:
+    import sqlalchemy as sa
+
+    with engine.connect() as conn:
+        rows = conn.execute(sa.text("PRAGMA table_info(video)")).fetchall()
+        columns = {row[1] for row in rows}
+        additions = {
+            "source_width": "INTEGER",
+            "source_height": "INTEGER",
+            "source_url": "TEXT",
+            "source_provider": "TEXT",
+        }
+        for name, col_type in additions.items():
+            if name not in columns:
+                conn.execute(sa.text(f"ALTER TABLE video ADD COLUMN {name} {col_type}"))
+        conn.commit()
+
+
 def create_db_engine(settings: Settings):
     db_path = settings.database_url.replace("sqlite:///", "")
     if db_path.startswith("./"):
@@ -124,4 +184,6 @@ def create_db_engine(settings: Settings):
         url = settings.database_url
     engine = create_engine(url, connect_args={"check_same_thread": False})
     SQLModel.metadata.create_all(engine)
+    if url.startswith("sqlite"):
+        _migrate_sqlite(engine)
     return engine

@@ -14,6 +14,10 @@ class Video(SQLModel, table=True):
     source_path: str
     duration_sec: float = 0.0
     language: str | None = None
+    source_width: int | None = None
+    source_height: int | None = None
+    source_url: str | None = None
+    source_provider: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -43,6 +47,14 @@ class Clip(SQLModel, table=True):
     reason: str
     output_path: str | None = None
     status: str = "pending"
+
+
+class ClipVariant(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    clip_id: str = Field(foreign_key="clip.id", index=True)
+    resolution: str
+    output_path: str
+    created_at: datetime = Field(default_factory=utcnow)
 
 
 class AppPreferences(SQLModel, table=True):
