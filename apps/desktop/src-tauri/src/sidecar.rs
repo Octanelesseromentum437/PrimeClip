@@ -21,15 +21,18 @@ impl SidecarManager {
     }
 
     pub fn spawn_sidecar(&self, app: &AppHandle) -> Result<(), String> {
-        let sidecar = app
+        let mut sidecar = app
             .shell()
             .sidecar("primeclip-api")
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+            .env("SIDECAR_PORT", self.port.to_string());
 
-        let (mut rx, child) = sidecar
-            .env("SIDECAR_PORT", self.port.to_string())
-            .spawn()
-            .map_err(|e| e.to_string())?;
+        #[cfg(feature = "bundle-full")]
+        {
+            sidecar = sidecar.env("BUNDLE_PROFILE", "full");
+        }
+
+        let (mut rx, child) = sidecar.spawn().map_err(|e| e.to_string())?;
 
         tauri::async_runtime::spawn(async move {
             while let Some(event) = rx.recv().await {
