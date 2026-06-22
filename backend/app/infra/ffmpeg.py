@@ -95,6 +95,75 @@ class FFmpegService:
             return int(stream["width"]), int(stream["height"])
         return 1920, 1080
 
+    def probe_rotation(self, video_path: Path) -> int:
+        ffprobe = self._resolve_ffprobe()
+        if not ffprobe:
+            return 0
+        result = subprocess.run(
+            [
+                str(ffprobe),
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream_side_data=rotation:stream_tags=rotate",
+                "-of",
+                "json",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return 0
+        try:
+            data = json.loads(result.stdout)
+            stream = data.get("streams", [{}])[0]
+            side_data = stream.get("side_data_list") or []
+            for entry in side_data:
+                if "rotation" in entry:
+                    return int(float(entry["rotation"]))
+            tags = stream.get("tags") or {}
+            if "rotate" in tags:
+                return int(tags["rotate"])
+        except (json.JSONDecodeError, KeyError, ValueError, IndexError):
+            pass
+        return 0
+
+    def normalize_rotation(self, video_path: Path) -> Path:
+        rotation = self.probe_rotation(video_path)
+        rotation = rotation % 360
+        if rotation == 0:
+            return video_path
+
+        transpose_map = {90: "transpose=1", 180: "transpose=1,transpose=1", 270: "transpose=2"}
+        vf = transpose_map.get(rotation)
+        if vf is None:
+            return video_path
+
+        normalized = video_path.parent / "source_normalized.mp4"
+        self.run(
+            [
+                "-y",
+                "-i",
+                str(video_path),
+                "-vf",
+                vf,
+                "-c:v",
+                "libx264",
+                "-preset",
+                "fast",
+                "-crf",
+                "18",
+                "-c:a",
+                "copy",
+                str(normalized),
+            ]
+        )
+        return normalized
+
     def extract_audio(self, video_path: Path, output_path: Path) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         self.run(

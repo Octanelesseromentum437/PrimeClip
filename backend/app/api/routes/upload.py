@@ -39,6 +39,10 @@ def _register_uploaded_video(
     except FFmpegError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    normalized = ffmpeg.normalize_rotation(path)
+    if normalized != path:
+        path = normalized
+
     video = Video(
         id=video_id,
         filename=filename,
