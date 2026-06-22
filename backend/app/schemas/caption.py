@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.schemas.common import CaptionStyleName
+from app.schemas.timeline import TimelineState
 from pydantic import BaseModel, Field
 
 
@@ -25,6 +26,7 @@ class CaptionCue(BaseModel):
 class CaptionEditState(BaseModel):
     cues: list[CaptionCue] = Field(default_factory=list)
     style: CaptionStyle = Field(default_factory=CaptionStyle)
+    timeline: TimelineState = Field(default_factory=TimelineState)
 
 
 class CaptionFiles(BaseModel):
@@ -79,6 +81,7 @@ class CaptionEditResponse(BaseModel):
     cues: list[CaptionCue]
     style: CaptionStyle
     preset: CaptionStyleName | None = None
+    timeline: TimelineState = Field(default_factory=TimelineState)
 
 
 class CaptionEditPatch(BaseModel):
@@ -86,3 +89,4 @@ class CaptionEditPatch(BaseModel):
     style: CaptionStyle | None = None
     preset: CaptionStyleName | None = None
     words_per_screen: int | None = Field(default=None, ge=1, le=10)
+    timeline: TimelineState | None = None

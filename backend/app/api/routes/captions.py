@@ -39,6 +39,7 @@ def get_captions(
         cues=state.cues,
         style=state.style,
         preset=preset,
+        timeline=state.timeline,
     )
 
 
@@ -63,6 +64,8 @@ def patch_captions(
         state.cues = rerender_svc.rechunk_cues(clip, state.style)
     if body.cues is not None:
         state.cues = body.cues
+    if body.timeline is not None:
+        state.timeline = body.timeline
 
     rerender_svc.save_edit_state(clip, state)
     preset = _detect_preset(state.style)
@@ -71,6 +74,7 @@ def patch_captions(
         cues=state.cues,
         style=state.style,
         preset=preset,
+        timeline=state.timeline,
     )
 
 
