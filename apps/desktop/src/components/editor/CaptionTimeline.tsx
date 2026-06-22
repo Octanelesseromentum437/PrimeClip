@@ -53,6 +53,25 @@ export function CaptionTimeline({
   const timelineWidth = Math.max((duration || 1) * PX_PER_SEC, 400);
   const ticks = useMemo(() => buildTicks(duration || 1), [duration]);
 
+  const updatePlayhead = useCallback(
+    (t: number) => {
+      if (duration <= 0) return;
+      const x = (t / duration) * timelineWidth;
+      if (playheadRef.current) {
+        playheadRef.current.style.transform = `translateX(${x}px)`;
+      }
+    },
+    [duration, timelineWidth],
+  );
+
+  const seekTo = useCallback(
+    (t: number) => {
+      updatePlayhead(t);
+      onSeek(t);
+    },
+    [updatePlayhead, onSeek],
+  );
+
   useEffect(() => {
     if (!playing || duration <= 0) return;
 
@@ -61,10 +80,7 @@ export function CaptionTimeline({
 
     const tick = () => {
       const t = getCurrentTime();
-      const x = (t / duration) * timelineWidth;
-      if (playheadRef.current) {
-        playheadRef.current.style.transform = `translateX(${x}px)`;
-      }
+      updatePlayhead(t);
 
       const activeIdx = cues.findIndex((c) => t >= c.start && t < c.end);
       if (activeIdx !== lastActive) {
@@ -79,17 +95,13 @@ export function CaptionTimeline({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, duration, timelineWidth, cues, getCurrentTime]);
+  }, [playing, duration, cues, getCurrentTime, updatePlayhead]);
 
   useEffect(() => {
     if (!playing && duration > 0) {
-      const t = getCurrentTime();
-      const x = (t / duration) * timelineWidth;
-      if (playheadRef.current) {
-        playheadRef.current.style.transform = `translateX(${x}px)`;
-      }
+      updatePlayhead(getCurrentTime());
     }
-  }, [playing, duration, timelineWidth, getCurrentTime, selectedIndex]);
+  }, [playing, duration, getCurrentTime, selectedIndex, updatePlayhead]);
 
   useEffect(() => {
     if (selectedIndex === null || !scrollRef.current) return;
@@ -115,7 +127,7 @@ export function CaptionTimeline({
 
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest(".caption-block")) return;
-    onSeek(timeFromClientX(e.clientX));
+    seekTo(timeFromClientX(e.clientX));
   };
 
   const startEdgeDrag = (
@@ -206,7 +218,7 @@ export function CaptionTimeline({
               style={{ width: timelineWidth }}
               onClick={handleTrackClick}
               onKeyDown={(e) => {
-                if (e.key === "Enter") onSeek(getCurrentTime());
+                if (e.key === "Enter") seekTo(getCurrentTime());
               }}
               role="slider"
               tabIndex={0}
@@ -233,7 +245,7 @@ export function CaptionTimeline({
                     onClick={(e) => {
                       e.stopPropagation();
                       onSelect(index);
-                      onSeek(cue.start);
+                      seekTo(cue.start);
                     }}
                     title={`${formatCueTime(cue.start)} – ${formatCueTime(cue.end)}`}
                   >
