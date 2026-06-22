@@ -134,6 +134,15 @@ class ClipGenerationPipeline:
             ctx.clip_candidates = await provider.generate_clip_candidates(
                 request, ctx.provider_config
             )
+            if not ctx.clip_candidates:
+                from app.providers.json_utils import fallback_heuristic_clips
+
+                ctx.clip_candidates = fallback_heuristic_clips(
+                    ctx.transcript,
+                    ctx.scenes,
+                    duration_sec=ctx.duration_sec,
+                    num_clips=ctx.num_clips,
+                )
             self.file_store.write_json_artifact(
                 ctx.video_id,
                 "clip_candidates.json",
