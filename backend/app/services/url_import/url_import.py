@@ -69,7 +69,7 @@ class UrlImportService:
                     if total:
                         job.progress_pct = min(99, int(downloaded / total * 100))
 
-            await asyncio.to_thread(
+            title = await asyncio.to_thread(
                 self._download,
                 job.url,
                 output_template,
@@ -80,7 +80,8 @@ class UrlImportService:
             if not source_files:
                 raise RuntimeError("Download completed but no video file was found")
             source_path = source_files[0]
-            title = source_path.name
+            if not title:
+                title = source_path.name
 
             response = await register_video(
                 video_id=video_id,
@@ -96,18 +97,23 @@ class UrlImportService:
             job.status = "failed"
             job.error_message = str(exc)
 
-    def _download(self, url: str, output_template: str, progress_hook) -> None:
+    def _download(self, url: str, output_template: str, progress_hook) -> str | None:
         import yt_dlp
         from yt_dlp.utils import DownloadError
 
         format_attempts = ("bv*+ba/b", "best")
         last_error: Exception | None = None
+        title: str | None = None
         for fmt in format_attempts:
             try:
                 ydl_opts = self._build_ydl_opts(output_template, progress_hook, format_selector=fmt)
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
-                return
+                    info = ydl.extract_info(url, download=True)
+                    if info:
+                        raw_title = info.get("title")
+                        if raw_title:
+                            title = str(raw_title).strip()
+                return title
             except DownloadError as exc:
                 last_error = exc
                 if "403" not in str(exc) or fmt == format_attempts[-1]:
@@ -116,6 +122,7 @@ class UrlImportService:
 
         if last_error:
             raise last_error
+        return title
 
     def _build_ydl_opts(
         self,
