@@ -79,6 +79,11 @@ export function useGlobalJobMonitor() {
           patchUploadSession({ activeGeneration: null });
           lastStageRef.current = null;
         }
+
+        if (job.status === "cancelled") {
+          patchUploadSession({ activeGeneration: null });
+          lastStageRef.current = null;
+        }
       } catch {
         // API unavailable — retry on next tick
       }
