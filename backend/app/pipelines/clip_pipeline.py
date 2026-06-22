@@ -26,6 +26,10 @@ from sqlmodel import Session
 logger = logging.getLogger(__name__)
 
 
+class JobCancelledError(Exception):
+    pass
+
+
 class ClipGenerationPipeline:
     STAGES = [
         "extract_audio",
@@ -63,6 +67,11 @@ class ClipGenerationPipeline:
         self.render = render
         self.ffmpeg = ffmpeg
 
+    def _check_cancelled(self, job: Job, session: Session) -> None:
+        session.refresh(job)
+        if job.status == JobStatus.CANCELLED.value:
+            raise JobCancelledError()
+
     async def run(
         self,
         ctx: PipelineContext,
@@ -89,6 +98,7 @@ class ClipGenerationPipeline:
             update("extract_audio", 5)
             audio_path = self.file_store.artifact_dir(ctx.video_id) / "audio.wav"
             await asyncio.to_thread(self.audio.extract, ctx.video_path, audio_path)
+            self._check_cancelled(job, session)
             ctx.audio_path = audio_path
 
             # Stage 2: Transcribe
@@ -99,6 +109,7 @@ class ClipGenerationPipeline:
             ctx.transcript = await asyncio.to_thread(
                 self.transcription.transcribe, audio_path, language=lang
             )
+            self._check_cancelled(job, session)
             self.file_store.write_json_artifact(
                 ctx.video_id,
                 "transcript.json",
@@ -113,6 +124,7 @@ class ClipGenerationPipeline:
                 threshold=self.settings.scene_threshold,
                 min_scene_len_sec=self.settings.scene_min_len_sec,
             )
+            self._check_cancelled(job, session)
             self.file_store.write_json_artifact(
                 ctx.video_id,
                 "scenes.json",
@@ -134,6 +146,7 @@ class ClipGenerationPipeline:
             ctx.clip_candidates = await provider.generate_clip_candidates(
                 request, ctx.provider_config
             )
+            self._check_cancelled(job, session)
             if not ctx.clip_candidates:
                 from app.providers.json_utils import fallback_heuristic_clips
 
@@ -154,6 +167,7 @@ class ClipGenerationPipeline:
             ctx.source_width, ctx.source_height = await asyncio.to_thread(
                 self.ffmpeg.probe_dimensions, ctx.video_path
             )
+            self._check_cancelled(job, session)
 
             # Stage 6: Render clips
             db_clips: list[Clip] = []
@@ -177,6 +191,7 @@ class ClipGenerationPipeline:
 
             output_dir = self.file_store.clips_output_dir(ctx.video_id)
             for db_clip, candidate in zip(db_clips, ctx.clip_candidates, strict=True):
+                self._check_cancelled(job, session)
                 try:
                     clip_faces = await asyncio.to_thread(
                         self.face_tracking.track,
@@ -248,6 +263,15 @@ class ClipGenerationPipeline:
             job.current_stage = "done"
             job.finished_at = datetime.now(UTC)
             job_repo.update(job)
+            return job
+
+        except JobCancelledError:
+            logger.info("Pipeline cancelled for job %s", job.id)
+            session.refresh(job)
+            if job.status != JobStatus.CANCELLED.value:
+                job.status = JobStatus.CANCELLED.value
+                job.finished_at = datetime.now(UTC)
+                job_repo.update(job)
             return job
 
         except Exception as exc:
