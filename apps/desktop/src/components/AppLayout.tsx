@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { ActiveUploadBanner } from "./ActiveUploadBanner";
+import { ApiStartupBanner } from "./ApiStartupBanner";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout() {
@@ -19,6 +20,7 @@ export function AppLayout() {
       <Sidebar />
       <div className="app-main">
         <div className="titlebar-drag" data-tauri-drag-region />
+        <ApiStartupBanner />
         <ActiveUploadBanner />
         <div className="app-content">
           <Outlet />
