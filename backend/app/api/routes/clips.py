@@ -1,7 +1,13 @@
+from pathlib import Path
+
 from app.api.deps import get_db_session
-from app.db.repository import ClipRepository
+from app.api.deps_captions import get_clip_rerender_service
+from app.db.models import ClipVariant
+from app.db.repository import ClipRepository, ClipVariantRepository, VideoRepository
 from app.schemas.clip import ClipRecordResponse
-from fastapi import APIRouter, Depends, HTTPException
+from app.schemas.common import Resolution, available_resolutions
+from app.services.captions.rerender import ClipRerenderService
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -37,14 +43,68 @@ def list_clips(video_id: str, session: Session = Depends(get_db_session)) -> Cli
 download_router = APIRouter(prefix="/download", tags=["clips"])
 
 
-@download_router.get("/{clip_id}")
-def download_clip(clip_id: str, session: Session = Depends(get_db_session)) -> FileResponse:
-    clip = ClipRepository(session).get(clip_id)
-    if not clip or not clip.output_path:
-        raise HTTPException(status_code=404, detail="Clip not found")
-    from pathlib import Path
+class QualitiesResponse(BaseModel):
+    resolutions: list[str]
 
-    path = Path(clip.output_path)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Clip file missing")
-    return FileResponse(path, media_type="video/mp4", filename=path.name)
+
+@download_router.get("/{clip_id}/qualities", response_model=QualitiesResponse)
+def list_qualities(
+    clip_id: str,
+    session: Session = Depends(get_db_session),
+) -> QualitiesResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    video = VideoRepository(session).get(clip.video_id)
+    if not video or not video.source_width or not video.source_height:
+        return QualitiesResponse(resolutions=[Resolution.HD.value, Resolution.SD.value])
+    resolutions = [r.value for r in available_resolutions(video.source_width, video.source_height)]
+    return QualitiesResponse(resolutions=resolutions)
+
+
+@download_router.get("/{clip_id}")
+def download_clip(
+    clip_id: str,
+    resolution: Resolution | None = Query(default=None),
+    session: Session = Depends(get_db_session),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+) -> FileResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    target = resolution or Resolution.HD
+    variant_repo = ClipVariantRepository(session)
+
+    if target == Resolution.HD and clip.output_path and resolution is None:
+        path = Path(clip.output_path)
+        if path.is_file():
+            return FileResponse(path, media_type="video/mp4", filename=path.name)
+
+    variant = variant_repo.get(clip_id, target.value)
+    if variant and Path(variant.output_path).is_file():
+        path = Path(variant.output_path)
+        return FileResponse(path, media_type="video/mp4", filename=path.name)
+
+    video = VideoRepository(session).get(clip.video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    if video.source_width and video.source_height:
+        allowed = {r.value for r in available_resolutions(video.source_width, video.source_height)}
+        if target.value not in allowed:
+            raise HTTPException(status_code=400, detail="Resolution exceeds source quality")
+
+    output_path = rerender_svc.rerender(clip, Path(video.source_path), resolution=target)
+    variant_repo.upsert(
+        ClipVariant(
+            clip_id=clip.id,
+            resolution=target.value,
+            output_path=str(output_path),
+        )
+    )
+    if target == Resolution.HD:
+        clip.output_path = str(output_path)
+        ClipRepository(session).update(clip)
+
+    return FileResponse(output_path, media_type="video/mp4", filename=output_path.name)

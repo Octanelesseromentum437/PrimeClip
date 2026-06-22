@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from app.db.models import Clip
+from app.db.models import Clip, ClipVariant
 from app.infra.ffmpeg import FFmpegService
 from app.infra.storage import FileStore
 from app.schemas.caption import CaptionEditState, CaptionStyle, STYLE_PRESETS
@@ -128,7 +128,7 @@ class ClipRerenderService:
         motion_plan = self.motion.plan(candidate, transcript)
 
         output_dir = self.file_store.clips_output_dir(clip.video_id)
-        output_path = output_dir / f"clip_{clip.index:02d}.mp4"
+        output_path = self._output_path(output_dir, clip.index, resolution)
 
         self.render.render(
             RenderRequest(
@@ -142,3 +142,8 @@ class ClipRerenderService:
             )
         )
         return output_path
+
+    def _output_path(self, output_dir: Path, clip_index: int, resolution: Resolution) -> Path:
+        if resolution == Resolution.HD:
+            return output_dir / f"clip_{clip_index:02d}.mp4"
+        return output_dir / f"clip_{clip_index:02d}_{resolution.value}.mp4"

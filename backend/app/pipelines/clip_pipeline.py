@@ -4,14 +4,14 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from app.config import Settings
-from app.db.models import Clip, Job
-from app.db.repository import ClipRepository, JobRepository
+from app.db.models import Clip, ClipVariant, Job
+from app.db.repository import ClipRepository, ClipVariantRepository, JobRepository
 from app.infra.ffmpeg import FFmpegService
 from app.infra.storage import FileStore
 from app.pipelines.context import PipelineContext
 from app.providers.registry import ProviderRegistry
 from app.schemas.clip import ClipSelectionRequest
-from app.schemas.common import CaptionStyleName, ClipStatus, JobStatus
+from app.schemas.common import CaptionStyleName, ClipStatus, JobStatus, Resolution
 from app.schemas.caption import STYLE_PRESETS
 from app.services.audio.extract import AudioExtractService
 from app.services.captions.generator import CaptionService
@@ -221,6 +221,13 @@ class ClipGenerationPipeline:
                     )
                     db_clip.output_path = str(output_path)
                     db_clip.status = ClipStatus.READY.value
+                    ClipVariantRepository(session).upsert(
+                        ClipVariant(
+                            clip_id=db_clip.id,
+                            resolution=Resolution.HD.value,
+                            output_path=str(output_path),
+                        )
+                    )
                 except Exception as exc:
                     logger.exception("Failed to render clip %s", db_clip.index)
                     db_clip.status = ClipStatus.FAILED.value
