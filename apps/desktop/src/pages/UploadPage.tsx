@@ -55,6 +55,7 @@ export function UploadPage() {
   const [kind, setKind] = useState<ProviderKind>("ollama");
   const [model, setModel] = useState("");
   const [numClips, setNumClips] = useState(5);
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const importPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -294,6 +295,7 @@ export function UploadPage() {
         },
         numClips,
         whisperLang,
+        aspectRatio,
       );
       patchUploadSession({
         activeGeneration: { videoId: upload.video_id, jobId: job_id },
@@ -547,6 +549,23 @@ export function UploadPage() {
               />
             </label>
           )}
+
+          <label className="block">
+            <span className="label-muted">Clip format</span>
+            <select
+              value={aspectRatio}
+              onChange={(e) => setAspectRatio(e.target.value as "9:16" | "16:9")}
+              className="input mt-1"
+            >
+              <option value="9:16">Vertical 9:16 (Shorts / Reels / TikTok)</option>
+              <option value="16:9">Horizontal 16:9 (YouTube / landscape)</option>
+            </select>
+            {aspectRatio === "16:9" && (
+              <p className="mt-1 text-xs text-app-fg-subtle">
+                Skips face tracking — uses a centered crop instead.
+              </p>
+            )}
+          </label>
 
           <label className="block">
             <span className="label-muted">
