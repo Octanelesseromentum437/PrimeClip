@@ -2,18 +2,12 @@
 from pathlib import Path
 
 from app.infra.ffmpeg import FFmpegService
-from app.schemas.common import Resolution
+from app.schemas.common import AspectRatio, Resolution, output_dimensions
 from app.schemas.crop import CropPath
 from app.schemas.render import RenderRequest, RenderResult
 
 
 class RenderService:
-    RESOLUTIONS = {
-        Resolution.UHD: (2160, 3840),
-        Resolution.HD: (1080, 1920),
-        Resolution.SD: (720, 1280),
-    }
-
     def __init__(self, ffmpeg: FFmpegService) -> None:
         self.ffmpeg = ffmpeg
 
@@ -23,8 +17,10 @@ class RenderService:
             escaped = escaped.replace(char, f"\\{char}")
         return escaped
 
-    def _crop_filter(self, crop_path: CropPath) -> str:
+    def _crop_filter(self, crop_path: CropPath, aspect_ratio: AspectRatio) -> str:
         if not crop_path.keyframes:
+            if aspect_ratio == AspectRatio.HORIZONTAL:
+                return "crop=ih*16/9:ih:(iw-ih*16/9)/2:0"
             return "crop=ih*9/16:ih:(iw-ih*9/16)/2:0"
         kf = crop_path.keyframes[0]
         sw, sh = crop_path.source_width, crop_path.source_height
@@ -39,13 +35,16 @@ class RenderService:
         return f"crop={w}:{h}:{x}:{y}"
 
     def render(self, request: RenderRequest) -> RenderResult:
-        out_w, out_h = self.RESOLUTIONS[request.resolution]
+        out_w, out_h = output_dimensions(request.aspect_ratio, request.resolution)
         start = request.clip.start
         duration = request.clip.end - request.clip.start
-        crop = self._crop_filter(request.crop_path)
+        crop = self._crop_filter(request.crop_path, request.aspect_ratio)
 
-        ass_path = self._escape_filter_path(request.caption_ass)
-        vf = f"{crop},scale={out_w}:{out_h},ass={ass_path}"
+        if request.burn_captions and request.caption_ass:
+            ass_path = self._escape_filter_path(request.caption_ass)
+            vf = f"{crop},scale={out_w}:{out_h},ass={ass_path}"
+        else:
+            vf = f"{crop},scale={out_w}:{out_h}"
 
         request.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.ffmpeg.run(
