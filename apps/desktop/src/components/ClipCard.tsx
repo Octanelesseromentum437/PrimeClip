@@ -144,7 +144,7 @@ export function ClipCard({ clip, videoId }: Props) {
             to={`/edit/${videoId}/${clip.id}`}
             className="btn-outline w-full text-center"
           >
-            Edit captions
+            Editar clip
           </Link>
         )}
 
