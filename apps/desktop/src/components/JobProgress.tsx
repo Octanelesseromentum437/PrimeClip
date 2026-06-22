@@ -45,7 +45,9 @@ export function JobProgress({ progress, stage, status }: Props) {
       ? t(stageTranslationKey(stage as PipelineStageId))
       : status === "completed"
         ? t("stage.done")
-        : status;
+        : status === "cancelled"
+          ? t("results.cancelled")
+          : status;
 
   const renderDetail =
     stage?.startsWith("render_clips") && stage.includes(":")
