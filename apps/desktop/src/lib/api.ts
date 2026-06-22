@@ -162,6 +162,37 @@ export async function clipPreviewUrl(clipId: string, resolution?: string): Promi
   return `${base}/api/download/${clipId}/preview${params}`;
 }
 
+/** Lowest available resolution — best for in-editor playback and scrubbing. */
+export function editorPreviewResolution(resolutions: string[]): string | undefined {
+  return resolutions.length > 0 ? resolutions[resolutions.length - 1] : undefined;
+}
+
+export async function clipFilmstripUrl(
+  clipId: string,
+  start: number,
+  end: number,
+  frames: number,
+  height: number,
+): Promise<string> {
+  const base = await resolveApiBase();
+  const params = new URLSearchParams({
+    start: start.toFixed(2),
+    end: end.toFixed(2),
+    frames: String(frames),
+    height: String(height),
+  });
+  return `${base}/api/download/${clipId}/filmstrip?${params}`;
+}
+
+export interface ClipWaveformData {
+  peaks: number[];
+  duration: number;
+}
+
+export async function fetchClipWaveform(clipId: string): Promise<ClipWaveformData> {
+  return request<ClipWaveformData>(`/api/download/${clipId}/waveform`);
+}
+
 export async function clipThumbnailUrl(clipId: string): Promise<string> {
   const base = await resolveApiBase();
   return `${base}/api/download/${clipId}/thumbnail`;
