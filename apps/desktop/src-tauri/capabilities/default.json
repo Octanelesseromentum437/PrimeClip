@@ -6,6 +6,15 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "primeclip-api",
+          "sidecar": true
+        }
+      ]
+    },
     "dialog:default",
     "notification:default"
   ]
