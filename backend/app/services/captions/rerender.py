@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
 
-from app.db.models import Clip, ClipVariant
+from app.db.models import Clip
 from app.infra.ffmpeg import FFmpegService
 from app.infra.storage import FileStore
-from app.schemas.caption import CaptionEditState, CaptionStyle, STYLE_PRESETS
+from app.schemas.caption import CaptionEditState, CaptionStyle
 from app.schemas.clip import ClipCandidate
 from app.schemas.common import AspectRatio, CaptionStyleName, Resolution, resolution_label
 from app.schemas.crop import CropPath
@@ -77,7 +77,8 @@ class ClipRerenderService:
         )
 
     def assets_dir(self, clip: Clip) -> Path:
-        return self.file_store.artifact_dir(clip.video_id) / f"clip_{clip.index:02d}" / "editor_assets"
+        clip_dir = self.file_store.artifact_dir(clip.video_id) / f"clip_{clip.index:02d}"
+        return clip_dir / "editor_assets"
 
     def _has_timeline_edits(self, state: CaptionEditState) -> bool:
         tl = state.timeline
