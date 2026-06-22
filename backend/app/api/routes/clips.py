@@ -15,6 +15,7 @@ from app.schemas.common import (
     resolution_label,
 )
 from app.services.captions.rerender import ClipRerenderService
+from app.services.media_cache import ensure_clip_filmstrip, ensure_clip_waveform
 from app.services.thumbnails import ensure_clip_thumbnail
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -101,6 +102,18 @@ def list_qualities(
     return QualitiesResponse(resolutions=resolutions, aspect_ratio=aspect_ratio.value)
 
 
+def _editor_preview_resolution(
+    aspect_ratio: AspectRatio,
+    source_width: int | None,
+    source_height: int | None,
+) -> Resolution:
+    if source_width and source_height:
+        allowed = available_resolution_labels(source_width, source_height, aspect_ratio)
+        if allowed:
+            return parse_resolution_label(allowed[-1], aspect_ratio)
+    return Resolution.SD
+
+
 @download_router.get("/{clip_id}/preview")
 def preview_clip(
     clip_id: str,
@@ -116,12 +129,19 @@ def preview_clip(
         raise HTTPException(status_code=404, detail="Video not found")
 
     aspect_ratio = rerender_svc.load_aspect_ratio(clip.video_id)
-    target = _resolve_resolution(
-        resolution,
-        aspect_ratio,
-        video.source_width,
-        video.source_height,
-    )
+    if resolution:
+        target = _resolve_resolution(
+            resolution,
+            aspect_ratio,
+            video.source_width,
+            video.source_height,
+        )
+    else:
+        target = _editor_preview_resolution(
+            aspect_ratio,
+            video.source_width,
+            video.source_height,
+        )
 
     preview_path = rerender_svc.preview_path(clip, target)
     if not preview_path.is_file():
@@ -137,6 +157,91 @@ def preview_clip(
         content_disposition_type="inline",
         filename=preview_path.name,
     )
+
+
+@download_router.get("/{clip_id}/filmstrip")
+def clip_filmstrip(
+    clip_id: str,
+    start: float = Query(default=0.0, ge=0.0),
+    end: float = Query(..., gt=0.0),
+    frames: int = Query(default=8, ge=1, le=60),
+    height: int = Query(default=48, ge=16, le=256),
+    session: Session = Depends(get_db_session),
+    file_store: FileStore = Depends(get_file_store),
+    ffmpeg: FFmpegService = Depends(get_ffmpeg_service),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+) -> FileResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    video = VideoRepository(session).get(clip.video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    aspect_ratio = rerender_svc.load_aspect_ratio(clip.video_id)
+    resolution = _editor_preview_resolution(
+        aspect_ratio,
+        video.source_width,
+        video.source_height,
+    )
+
+    filmstrip_path = ensure_clip_filmstrip(
+        clip,
+        Path(video.source_path),
+        file_store,
+        ffmpeg,
+        rerender_svc,
+        start_sec=start,
+        end_sec=end,
+        frame_count=frames,
+        height=height,
+        resolution=resolution,
+    )
+
+    return FileResponse(
+        filmstrip_path,
+        media_type="image/jpeg",
+        content_disposition_type="inline",
+        filename=filmstrip_path.name,
+    )
+
+
+class WaveformResponse(BaseModel):
+    peaks: list[float]
+    duration: float
+
+
+@download_router.get("/{clip_id}/waveform", response_model=WaveformResponse)
+def clip_waveform(
+    clip_id: str,
+    session: Session = Depends(get_db_session),
+    file_store: FileStore = Depends(get_file_store),
+    ffmpeg: FFmpegService = Depends(get_ffmpeg_service),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+) -> WaveformResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    video = VideoRepository(session).get(clip.video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    aspect_ratio = rerender_svc.load_aspect_ratio(clip.video_id)
+    resolution = _editor_preview_resolution(
+        aspect_ratio,
+        video.source_width,
+        video.source_height,
+    )
+
+    payload = ensure_clip_waveform(
+        clip,
+        Path(video.source_path),
+        file_store,
+        ffmpeg,
+        rerender_svc,
+        resolution=resolution,
+    )
+    return WaveformResponse.model_validate(payload)
 
 
 @download_router.get("/{clip_id}/thumbnail")
