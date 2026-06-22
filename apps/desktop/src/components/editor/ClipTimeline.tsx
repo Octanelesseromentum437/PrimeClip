@@ -36,6 +36,7 @@ interface ClipTimelineProps {
   onMarkOut: () => void;
   onSplitAtPlayhead: () => void;
   videoUrl?: string | null;
+  clipId?: string | null;
   mediaUrls?: Record<string, string>;
 }
 
@@ -99,6 +100,7 @@ export function ClipTimeline({
   onMarkOut,
   onSplitAtPlayhead,
   videoUrl = null,
+  clipId = null,
   mediaUrls = {},
 }: ClipTimelineProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -697,6 +699,7 @@ export function ClipTimeline({
               >
                 {videoUrl && (
                   <TimelineFilmstrip
+                    clipId={clipId}
                     src={videoUrl}
                     width={videoWidth}
                     height={MEDIA_TRACK_H - 4}
@@ -749,6 +752,7 @@ export function ClipTimeline({
               >
                 {videoUrl && (
                   <TimelineWaveform
+                    clipId={clipId}
                     src={videoUrl}
                     width={videoAudioWidth}
                     height={MEDIA_TRACK_H - 4}

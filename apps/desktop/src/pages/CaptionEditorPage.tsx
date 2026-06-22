@@ -121,9 +121,8 @@ export function CaptionEditorPage() {
       setFonts(systemFonts.length ? systemFonts : FALLBACK_FONTS);
       setSelection(data.cues.length ? { type: "caption", index: 0 } : { type: "video" });
 
-      const resolution = qualities.resolutions[0];
       const [preview, thumb] = await Promise.all([
-        clipPreviewUrl(clipId, resolution),
+        clipPreviewUrl(clipId),
         clipThumbnailUrl(clipId).catch(() => null),
       ]);
       setVideoUrl(`${preview}?t=${Date.now()}`);
@@ -673,6 +672,7 @@ export function CaptionEditorPage() {
         onMarkOut={handleMarkOut}
         onSplitAtPlayhead={handleSplitAtPlayhead}
         videoUrl={videoUrl}
+        clipId={clipId}
         mediaUrls={mediaUrls}
       />
     </div>
