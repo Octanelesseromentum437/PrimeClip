@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.config import Settings, get_settings
@@ -11,6 +12,7 @@ from app.infra.storage import FileStore
 from app.pipelines.clip_pipeline import ClipGenerationPipeline
 from app.pipelines.context import PipelineContext
 from app.providers.registry import ProviderRegistry
+from app.schemas.common import JobStatus
 from app.schemas.provider import ProviderConfig
 from app.services.captions.generator import CaptionService
 from app.services.face_tracking.mediapipe_tracker import FaceTrackingService
@@ -73,6 +75,23 @@ class JobRunner:
         self._running[job_id] = task
         task.add_done_callback(lambda _: self._running.pop(job_id, None))
 
+    def cancel(self, job_id: str, session: Session) -> bool:
+        job_repo = JobRepository(session)
+        job = job_repo.get(job_id)
+        if not job:
+            return False
+        if job.status not in (JobStatus.QUEUED.value, JobStatus.RUNNING.value):
+            return False
+
+        job.status = JobStatus.CANCELLED.value
+        job.finished_at = datetime.now(UTC)
+        job_repo.update(job)
+
+        task = self._running.get(job_id)
+        if task and not task.done():
+            task.cancel()
+        return True
+
     async def _run_job(
         self,
         job_id: str,
@@ -92,6 +111,8 @@ class JobRunner:
             video = video_repo.get(video_id)
             if not job or not video:
                 return
+            if job.status == JobStatus.CANCELLED.value:
+                return
 
             ctx = PipelineContext(
                 video_id=video_id,
@@ -103,7 +124,21 @@ class JobRunner:
                 caption_style=caption_style,
                 words_per_screen=words_per_screen,
             )
-            await self.pipeline.run(ctx, job, session)
+            try:
+                await self.pipeline.run(ctx, job, session)
+            except asyncio.CancelledError:
+                with Session(get_engine()) as cancel_session:
+                    cancel_repo = JobRepository(cancel_session)
+                    cancelled_job = cancel_repo.get(job_id)
+                    if cancelled_job and cancelled_job.status not in (
+                        JobStatus.CANCELLED.value,
+                        JobStatus.COMPLETED.value,
+                        JobStatus.FAILED.value,
+                    ):
+                        cancelled_job.status = JobStatus.CANCELLED.value
+                        cancelled_job.finished_at = datetime.now(UTC)
+                        cancel_repo.update(cancelled_job)
+                raise
 
 
 _runner: JobRunner | None = None
