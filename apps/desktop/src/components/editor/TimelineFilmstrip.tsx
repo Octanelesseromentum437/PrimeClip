@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { clipFilmstripUrl } from "../../lib/api";
 import { filmstripFrameCount, loadVideoFilmstrip } from "../../lib/videoFilmstrip";
 
 interface TimelineFilmstripProps {
@@ -7,6 +8,8 @@ interface TimelineFilmstripProps {
   height: number;
   rangeStart: number;
   rangeEnd: number;
+  /** When set, frames are generated server-side via FFmpeg (much faster). */
+  clipId?: string | null;
 }
 
 export function TimelineFilmstrip({
@@ -15,19 +18,40 @@ export function TimelineFilmstrip({
   height,
   rangeStart,
   rangeEnd,
+  clipId = null,
 }: TimelineFilmstripProps) {
+  const [spriteUrl, setSpriteUrl] = useState<string | null>(null);
   const [frames, setFrames] = useState<string[]>([]);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!src || width < 8 || rangeEnd <= rangeStart) {
+    if (width < 8 || rangeEnd <= rangeStart) {
+      setSpriteUrl(null);
       setFrames([]);
       return;
     }
 
     let cancelled = false;
     setFailed(false);
+    setSpriteUrl(null);
+    setFrames([]);
+
     const frameCount = filmstripFrameCount(width);
+
+    if (clipId) {
+      clipFilmstripUrl(clipId, rangeStart, rangeEnd, frameCount, height)
+        .then((url) => {
+          if (!cancelled) setSpriteUrl(url);
+        })
+        .catch(() => {
+          if (!cancelled) setFailed(true);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!src) return;
 
     loadVideoFilmstrip(src, rangeStart, rangeEnd, frameCount, height)
       .then((result) => {
@@ -43,9 +67,21 @@ export function TimelineFilmstrip({
     return () => {
       cancelled = true;
     };
-  }, [src, width, height, rangeStart, rangeEnd]);
+  }, [clipId, src, width, height, rangeStart, rangeEnd]);
 
-  if (!src || width < 8) return null;
+  if (width < 8) return null;
+
+  if (spriteUrl) {
+    return (
+      <img
+        src={spriteUrl}
+        alt=""
+        className="timeline-filmstrip-sprite"
+        style={{ width, height, objectFit: "cover" }}
+        draggable={false}
+      />
+    );
+  }
 
   if (frames.length === 0) {
     return failed ? <div className="timeline-filmstrip-fallback" aria-hidden /> : null;

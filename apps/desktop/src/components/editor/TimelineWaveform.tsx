@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { fetchClipWaveform } from "../../lib/api";
 import { loadAudioPeaks, slicePeaks } from "../../lib/audioPeaks";
 
 interface TimelineWaveformProps {
@@ -10,6 +11,8 @@ interface TimelineWaveformProps {
   /** Fallback when source file duration is not yet known. */
   fallbackDuration?: number;
   color?: string;
+  /** When set, peaks are precomputed server-side via FFmpeg. */
+  clipId?: string | null;
 }
 
 export function TimelineWaveform({
@@ -20,12 +23,14 @@ export function TimelineWaveform({
   sourceEnd,
   fallbackDuration = 0,
   color = "rgba(255,255,255,0.75)",
+  clipId = null,
 }: TimelineWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!src || width < 4 || height < 4) return;
+    if (width < 4 || height < 4) return;
+    if (!clipId && !src) return;
 
     let cancelled = false;
     setFailed(false);
@@ -62,7 +67,14 @@ export function TimelineWaveform({
       }
     };
 
-    loadAudioPeaks(src)
+    const load = clipId
+      ? fetchClipWaveform(clipId).then(({ peaks, duration }) => ({
+          peaks: Float32Array.from(peaks),
+          duration,
+        }))
+      : loadAudioPeaks(src!);
+
+    load
       .then(({ peaks, duration }) => {
         if (!cancelled) draw(peaks, duration || fallbackDuration);
       })
@@ -73,14 +85,14 @@ export function TimelineWaveform({
     return () => {
       cancelled = true;
     };
-  }, [src, width, height, sourceStart, sourceEnd, fallbackDuration, color]);
+  }, [clipId, src, width, height, sourceStart, sourceEnd, fallbackDuration, color]);
 
-  if (!src || width < 4) return null;
+  if ((!clipId && !src) || width < 4) return null;
 
   return (
     <canvas
       ref={canvasRef}
-      className={`timeline-waveform-canvas ${failed ? "timeline-waveform-canvas--failed" : ""}`}
+      className={`timeline-waveform${failed ? " timeline-waveform--failed" : ""}`}
       aria-hidden
     />
   );
