@@ -22,7 +22,9 @@ def test_resolve_storage_path_relative_to_cwd(tmp_path: Path, monkeypatch) -> No
 
 
 def test_resolve_storage_path_legacy_relative(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path / "backend")
+    backend_dir = tmp_path / "backend"
+    backend_dir.mkdir()
+    monkeypatch.chdir(backend_dir)
     outputs = tmp_path / "outputs"
     uploads = outputs / "uploads" / "vid"
     uploads.mkdir(parents=True)
