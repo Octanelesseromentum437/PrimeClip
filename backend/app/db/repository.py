@@ -19,6 +19,14 @@ class VideoRepository:
     def list_all(self) -> list[Video]:
         return list(self.session.exec(select(Video).order_by(Video.created_at.desc())).all())
 
+    def delete(self, video_id: str) -> bool:
+        video = self.get(video_id)
+        if video is None:
+            return False
+        self.session.delete(video)
+        self.session.commit()
+        return True
+
 
 class JobRepository:
     def __init__(self, session: Session) -> None:
@@ -43,6 +51,15 @@ class JobRepository:
         stmt = select(Job).where(Job.video_id == video_id).order_by(Job.started_at.desc())  # type: ignore[arg-type]
         return self.session.exec(stmt).first()
 
+    def list_for_video(self, video_id: str) -> list[Job]:
+        stmt = select(Job).where(Job.video_id == video_id).order_by(Job.started_at.desc())  # type: ignore[arg-type]
+        return list(self.session.exec(stmt).all())
+
+    def delete_for_video(self, video_id: str) -> None:
+        for job in self.list_for_video(video_id):
+            self.session.delete(job)
+        self.session.commit()
+
 
 class ClipRepository:
     def __init__(self, session: Session) -> None:
@@ -59,6 +76,14 @@ class ClipRepository:
     def list_for_video(self, video_id: str) -> list[Clip]:
         stmt = select(Clip).where(Clip.video_id == video_id).order_by(Clip.index)
         return list(self.session.exec(stmt).all())
+
+    def count_for_video(self, video_id: str) -> int:
+        return len(self.list_for_video(video_id))
+
+    def delete_for_video(self, video_id: str) -> None:
+        for clip in self.list_for_video(video_id):
+            self.session.delete(clip)
+        self.session.commit()
 
     def get(self, clip_id: str) -> Clip | None:
         return self.session.get(Clip, clip_id)
