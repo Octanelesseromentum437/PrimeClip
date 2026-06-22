@@ -1,8 +1,10 @@
+mod app_info;
 mod credentials;
 mod icon_shape;
 mod sidecar;
 mod state;
 
+use app_info::get_app_info;
 use icon_shape::set_icon_shape;
 use credentials::{
     delete_api_key_cmd, delete_google_tokens_cmd, get_api_base_url, get_api_key_cmd,
@@ -45,6 +47,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            get_app_info,
             store_api_key_cmd,
             get_api_key_cmd,
             delete_api_key_cmd,

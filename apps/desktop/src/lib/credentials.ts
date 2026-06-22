@@ -46,3 +46,15 @@ export async function deleteGoogleTokens(): Promise<void> {
 export async function getBundleProfile(): Promise<string> {
   return invoke<string>("get_bundle_profile");
 }
+
+export type AppInfo = {
+  name: string;
+  version: string;
+  repo_url: string;
+  git_commit: string;
+  git_branch: string;
+};
+
+export async function getAppInfo(): Promise<AppInfo> {
+  return invoke<AppInfo>("get_app_info");
+}
