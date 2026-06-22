@@ -93,6 +93,67 @@ export interface CaptionEditResponse {
   cues: CaptionCue[];
   style: CaptionStyle;
   preset: CaptionStyleName | null;
+  timeline: TimelineState;
+}
+
+export interface VideoTrim {
+  start: number;
+  end: number | null;
+}
+
+/** Timeline position and source offset for the main clip audio (J-cuts, L-cuts, audio-only). */
+export interface VideoAudioTrim {
+  start: number;
+  end: number | null;
+  source_start: number;
+  volume: number;
+}
+
+export interface OverlayItem {
+  id: string;
+  kind: "image" | "broll";
+  start: number;
+  end: number;
+  asset: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity: number;
+  volume: number;
+}
+
+export interface AudioItem {
+  id: string;
+  start: number;
+  end: number;
+  asset: string;
+  label: string;
+  volume: number;
+  source_offset: number;
+  fade_in: number;
+  fade_out: number;
+}
+
+export interface TimelineState {
+  trim: VideoTrim;
+  audio_trim: VideoAudioTrim;
+  overlays: OverlayItem[];
+  audio: AudioItem[];
+}
+
+export type EditorSelection =
+  | { type: "video" }
+  | { type: "video-audio" }
+  | { type: "caption"; index: number }
+  | { type: "overlay"; id: string }
+  | { type: "audio"; id: string };
+
+export interface MediaUploadResponse {
+  asset: string;
+  label: string;
+  url: string;
 }
 
 export interface DependencyStatus {
