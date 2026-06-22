@@ -14,7 +14,7 @@ use credentials::{
 };
 use sidecar::{SidecarManager, wait_for_api};
 use state::SidecarState;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 const DEFAULT_PORT: u16 = 8765;
 
@@ -35,9 +35,17 @@ fn main() {
             #[cfg(not(debug_assertions))]
             {
                 manager.spawn_sidecar(app.handle())?;
-                if !wait_for_api(&base_url) {
-                    eprintln!("Warning: sidecar health check timed out");
-                }
+                // PyInstaller onefile sidecar can take 30–90s on cold start; don't block the window.
+                let app_handle = app.handle().clone();
+                let wait_url = base_url.clone();
+                std::thread::spawn(move || {
+                    if wait_for_api(&wait_url) {
+                        let _ = app_handle.emit("api-ready", ());
+                    } else {
+                        eprintln!("Warning: sidecar health check timed out");
+                        let _ = app_handle.emit("api-startup-failed", ());
+                    }
+                });
             }
 
             app.manage(SidecarState {
