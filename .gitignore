@@ -17,6 +17,7 @@ resources/ffmpeg/**/*
 
 # Node / Tauri
 node_modules/
+apps/desktop/coverage/
 apps/desktop/dist/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/binaries/*
