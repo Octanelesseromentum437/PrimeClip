@@ -90,6 +90,7 @@ class JobRunner:
         task = self._running.get(job_id)
         if task and not task.done():
             task.cancel()
+        self.ffmpeg.kill_all()
         return True
 
     async def _run_job(

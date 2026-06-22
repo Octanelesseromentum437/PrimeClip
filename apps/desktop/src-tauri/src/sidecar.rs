@@ -50,6 +50,12 @@ impl SidecarManager {
     }
 }
 
+impl Drop for SidecarManager {
+    fn drop(&mut self) {
+        self.kill();
+    }
+}
+
 pub fn wait_for_api(base_url: &str) -> bool {
     for _ in 0..30 {
         if health_check(base_url).is_ok() {

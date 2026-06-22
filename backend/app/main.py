@@ -7,8 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.captions import router as captions_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
-from app.api.routes.drive import drive_upload_router
-from app.api.routes.drive import router as drive_router
+from app.api.routes.drive import drive_upload_router, router as drive_router
 from app.api.routes.jobs import jobs_router
 from app.api.routes.jobs import router as generate_router
 from app.api.routes.providers import health_router
@@ -32,6 +31,9 @@ async def lifespan(app: FastAPI):
         logger.info("Logging to %s", log_file)
     logger.info("PrimeClip API started (profile=%s)", settings.bundle_profile.value)
     yield
+    from app.jobs.runner import get_job_runner
+
+    get_job_runner().ffmpeg.kill_all()
 
 
 def create_app() -> FastAPI:
