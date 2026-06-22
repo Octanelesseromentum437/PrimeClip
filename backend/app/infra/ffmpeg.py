@@ -186,6 +186,69 @@ class FFmpegService:
         )
         return normalized
 
+    def extract_filmstrip(
+        self,
+        video_path: Path,
+        output_path: Path,
+        *,
+        start_sec: float,
+        end_sec: float,
+        frame_count: int,
+        height: int,
+    ) -> Path:
+        span = max(0.1, end_sec - start_sec)
+        frame_count = max(1, frame_count)
+        fps = frame_count / span
+        vf = f"fps={fps},scale=-2:{height},tile={frame_count}x1"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        self.run(
+            [
+                "-y",
+                "-ss",
+                str(max(0.0, start_sec)),
+                "-i",
+                str(video_path),
+                "-t",
+                str(span),
+                "-vf",
+                vf,
+                "-frames:v",
+                "1",
+                "-q:v",
+                "4",
+                str(output_path),
+            ]
+        )
+        return output_path
+
+    def extract_audio_f32(self, video_path: Path, *, sample_rate: int = 8000) -> tuple[bytes, int]:
+        cmd = [
+            str(self.ffmpeg),
+            "-i",
+            str(video_path),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            str(sample_rate),
+            "-f",
+            "f32le",
+            "pipe:1",
+        ]
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        ffmpeg_registry.add(proc)
+        try:
+            stdout, stderr = proc.communicate()
+        finally:
+            ffmpeg_registry.remove(proc)
+        if proc.returncode != 0:
+            raise FFmpegError(stderr.decode() if stderr else "ffmpeg audio extract failed")
+        return stdout, sample_rate
+
     def extract_frame(
         self,
         video_path: Path,
