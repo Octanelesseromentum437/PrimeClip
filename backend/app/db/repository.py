@@ -172,6 +172,11 @@ def _migrate_sqlite(engine) -> None:
         for name, col_type in additions.items():
             if name not in columns:
                 conn.execute(sa.text(f"ALTER TABLE video ADD COLUMN {name} {col_type}"))
+
+        clip_rows = conn.execute(sa.text("PRAGMA table_info(clip)")).fetchall()
+        clip_columns = {row[1] for row in clip_rows}
+        if "thumbnail_path" not in clip_columns:
+            conn.execute(sa.text("ALTER TABLE clip ADD COLUMN thumbnail_path TEXT"))
         conn.commit()
 
 

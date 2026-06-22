@@ -1,9 +1,11 @@
 from pathlib import Path
 
-from app.api.deps import get_db_session
+from app.api.deps import get_db_session, get_ffmpeg_service, get_file_store
 from app.api.deps_captions import get_clip_rerender_service
 from app.db.models import ClipVariant
 from app.db.repository import ClipRepository, ClipVariantRepository, VideoRepository
+from app.infra.ffmpeg import FFmpegService
+from app.infra.storage import FileStore
 from app.schemas.clip import ClipRecordResponse
 from app.schemas.common import (
     AspectRatio,
@@ -13,6 +15,7 @@ from app.schemas.common import (
     resolution_label,
 )
 from app.services.captions.rerender import ClipRerenderService
+from app.services.thumbnails import ensure_clip_thumbnail
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -40,6 +43,7 @@ def list_clips(video_id: str, session: Session = Depends(get_db_session)) -> Cli
                 reason=c.reason,
                 status=c.status,
                 output_path=c.output_path,
+                thumbnail_path=c.thumbnail_path,
             )
             for c in clips
         ]
@@ -127,7 +131,39 @@ def preview_clip(
             resolution=target,
         )
 
-    return FileResponse(preview_path, media_type="video/mp4", filename=preview_path.name)
+    return FileResponse(
+        preview_path,
+        media_type="video/mp4",
+        content_disposition_type="inline",
+        filename=preview_path.name,
+    )
+
+
+@download_router.get("/{clip_id}/thumbnail")
+def clip_thumbnail(
+    clip_id: str,
+    session: Session = Depends(get_db_session),
+    file_store: FileStore = Depends(get_file_store),
+    ffmpeg: FFmpegService = Depends(get_ffmpeg_service),
+) -> FileResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    thumb_path = ensure_clip_thumbnail(clip, file_store, ffmpeg)
+    if thumb_path is None:
+        raise HTTPException(status_code=404, detail="Thumbnail not available")
+
+    if clip.thumbnail_path != str(thumb_path):
+        clip.thumbnail_path = str(thumb_path)
+        ClipRepository(session).update(clip)
+
+    return FileResponse(
+        thumb_path,
+        media_type="image/jpeg",
+        content_disposition_type="inline",
+        filename=thumb_path.name,
+    )
 
 
 @download_router.get("/{clip_id}")
@@ -193,6 +229,6 @@ def download_clip(
     )
     if target == Resolution.HD:
         clip.output_path = str(output_path)
-        ClipRepository(session).update(clip)
+    ClipRepository(session).update(clip)
 
     return FileResponse(output_path, media_type="video/mp4", filename=output_path.name)

@@ -40,3 +40,4 @@ class ClipRecordResponse(BaseModel):
     reason: str
     status: str
     output_path: str | None = None
+    thumbnail_path: str | None = None

@@ -46,6 +46,7 @@ class Clip(SQLModel, table=True):
     score: float
     reason: str
     output_path: str | None = None
+    thumbnail_path: str | None = None
     status: str = "pending"
 
 

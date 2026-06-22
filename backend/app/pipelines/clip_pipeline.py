@@ -280,6 +280,16 @@ class ClipGenerationPipeline:
                             }
                         ),
                     )
+                    from app.services.thumbnails import ensure_clip_thumbnail
+
+                    thumb = await asyncio.to_thread(
+                        ensure_clip_thumbnail,
+                        db_clip,
+                        self.file_store,
+                        self.ffmpeg,
+                    )
+                    if thumb is not None:
+                        db_clip.thumbnail_path = str(thumb)
                     db_clip.output_path = str(output_path)
                     db_clip.status = ClipStatus.READY.value
                     ClipVariantRepository(session).upsert(

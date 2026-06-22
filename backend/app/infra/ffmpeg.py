@@ -186,6 +186,30 @@ class FFmpegService:
         )
         return normalized
 
+    def extract_frame(
+        self,
+        video_path: Path,
+        output_path: Path,
+        *,
+        timestamp_sec: float = 1.0,
+    ) -> Path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        self.run(
+            [
+                "-y",
+                "-ss",
+                str(max(0.0, timestamp_sec)),
+                "-i",
+                str(video_path),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "2",
+                str(output_path),
+            ]
+        )
+        return output_path
+
     def extract_audio(self, video_path: Path, output_path: Path) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         self.run(

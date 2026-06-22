@@ -238,6 +238,12 @@ class ClipRerenderService:
                 )
             )
 
+        from app.services.thumbnails import ensure_clip_thumbnail
+
+        thumb = ensure_clip_thumbnail(clip, self.file_store, self.ffmpeg)
+        if thumb is not None:
+            clip.thumbnail_path = str(thumb)
+
         return output_path
 
     def _output_path(
