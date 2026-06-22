@@ -1,12 +1,14 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { clipDownloadUrl } from "../lib/api";
 import type { ClipRecord } from "../lib/types";
 
 interface Props {
   clip: ClipRecord;
+  videoId?: string;
 }
 
-export function ClipCard({ clip }: Props) {
+export function ClipCard({ clip, videoId }: Props) {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,6 +33,14 @@ export function ClipCard({ clip }: Props) {
             className="w-full rounded-lg max-h-48 bg-black"
           />
         </div>
+      )}
+      {clip.status === "ready" && videoId && (
+        <Link
+          to={`/edit/${videoId}/${clip.id}`}
+          className="text-center py-2 rounded-lg border border-slate-700 hover:border-brand-500 text-sm font-medium"
+        >
+          Edit captions
+        </Link>
       )}
       {clip.status === "ready" && downloadUrl && (
         <a

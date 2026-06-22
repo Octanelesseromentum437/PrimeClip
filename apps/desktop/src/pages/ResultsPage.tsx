@@ -51,7 +51,7 @@ export function ResultsPage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           {clips.map((clip) => (
-            <ClipCard key={clip.id} clip={clip} />
+            <ClipCard key={clip.id} clip={clip} videoId={videoId} />
           ))}
         </div>
 
