@@ -129,9 +129,15 @@ export async function fetchClips(videoId: string): Promise<ClipRecord[]> {
   return data.clips;
 }
 
-export async function clipDownloadUrl(clipId: string): Promise<string> {
+export async function clipDownloadUrl(clipId: string, resolution?: string): Promise<string> {
   const base = await resolveApiBase();
-  return `${base}/api/download/${clipId}`;
+  const params = resolution ? `?resolution=${encodeURIComponent(resolution)}` : "";
+  return `${base}/api/download/${clipId}${params}`;
+}
+
+export async function fetchClipQualities(clipId: string): Promise<string[]> {
+  const data = await request<{ resolutions: string[] }>(`/api/download/${clipId}/qualities`);
+  return data.resolutions;
 }
 
 export async function fetchVideos(): Promise<VideoSummary[]> {

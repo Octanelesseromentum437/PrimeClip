@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { clipDownloadUrl } from "../lib/api";
+import { clipDownloadUrl, fetchClipQualities } from "../lib/api";
 import type { ClipRecord } from "../lib/types";
 
 interface Props {
@@ -10,10 +10,21 @@ interface Props {
 
 export function ClipCard({ clip, videoId }: Props) {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [qualities, setQualities] = useState<string[]>([]);
+  const [resolution, setResolution] = useState<string>("1080x1920");
 
   useEffect(() => {
-    clipDownloadUrl(clip.id).then(setDownloadUrl);
+    fetchClipQualities(clip.id)
+      .then((list) => {
+        setQualities(list);
+        if (list.length) setResolution(list[0]);
+      })
+      .catch(() => setQualities(["1080x1920"]));
   }, [clip.id]);
+
+  useEffect(() => {
+    clipDownloadUrl(clip.id, resolution).then(setDownloadUrl);
+  }, [clip.id, resolution]);
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 flex flex-col gap-3">
@@ -28,6 +39,7 @@ export function ClipCard({ clip, videoId }: Props) {
       {clip.status === "ready" && downloadUrl && (
         <div className="flex gap-2 mt-auto">
           <video
+            key={downloadUrl}
             src={downloadUrl}
             controls
             className="w-full rounded-lg max-h-48 bg-black"
@@ -42,14 +54,30 @@ export function ClipCard({ clip, videoId }: Props) {
           Edit captions
         </Link>
       )}
-      {clip.status === "ready" && downloadUrl && (
-        <a
-          href={downloadUrl}
-          download
-          className="text-center py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-sm font-medium"
-        >
-          Download
-        </a>
+      {clip.status === "ready" && downloadUrl && qualities.length > 0 && (
+        <div className="space-y-2">
+          <label className="block text-xs text-slate-400">
+            Quality
+            <select
+              value={resolution}
+              onChange={(e) => setResolution(e.target.value)}
+              className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-sm"
+            >
+              {qualities.map((q) => (
+                <option key={q} value={q}>
+                  {q}
+                </option>
+              ))}
+            </select>
+          </label>
+          <a
+            href={downloadUrl}
+            download
+            className="block text-center py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-sm font-medium"
+          >
+            Download
+          </a>
+        </div>
       )}
     </div>
   );
