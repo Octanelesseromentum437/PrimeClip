@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTheme } from "../lib/theme";
+import { useLocale } from "../lib/i18n";
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -44,6 +45,8 @@ function ThemeToggle() {
 }
 
 export function Nav() {
+  const { t } = useLocale();
+
   return (
     <nav className="nav-bar">
       <Link to="/" className="text-xl font-bold text-brand-600 dark:text-brand-500">
@@ -51,13 +54,13 @@ export function Nav() {
       </Link>
       <div className="flex items-center gap-3 lg:gap-4 text-sm">
         <Link to="/" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-          Upload
+          {t("nav.upload")}
         </Link>
         <Link to="/library" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-          Library
+          {t("nav.library")}
         </Link>
         <Link to="/settings" className="hover:text-brand-600 dark:hover:text-brand-400 transition-colors">
-          Settings
+          {t("nav.settings")}
         </Link>
         <ThemeToggle />
       </div>
