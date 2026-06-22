@@ -13,3 +13,4 @@ class DependencyReport(BaseModel):
     ffmpeg: DependencyStatus
     whisper_model: DependencyStatus
     ollama: DependencyStatus
+    ytdlp: DependencyStatus | None = None

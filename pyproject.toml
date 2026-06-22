@@ -20,6 +20,7 @@ dependencies = [
     "mediapipe>=0.10.14",
     "numpy>=1.26.0",
     "aiofiles>=24.1.0",
+    "yt-dlp>=2024.1.0",
 ]
 
 [project.optional-dependencies]

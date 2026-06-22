@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     primeclip_debug: bool = False
     scene_threshold: float = 0.3
     scene_min_len_sec: float = 2.0
+    ytdlp_path: str = ""
+    import_max_duration_sec: int = 7200
+    ytdlp_cookies_file: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
 
     @property
     def uploads_dir(self) -> Path:

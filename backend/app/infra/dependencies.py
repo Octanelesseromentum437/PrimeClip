@@ -143,11 +143,25 @@ class DependencyResolver:
             install_url="https://ollama.com/download",
         )
 
+    def check_ytdlp(self) -> DependencyStatus:
+        from app.services.url_import.url_import import UrlImportService
+
+        service = UrlImportService(self.settings)
+        if service.check_available():
+            return DependencyStatus(name="ytdlp", ok=True, message="yt-dlp available")
+        return DependencyStatus(
+            name="ytdlp",
+            ok=False,
+            message="yt-dlp not installed (optional for URL import)",
+            install_url="https://github.com/yt-dlp/yt-dlp#installation",
+        )
+
     def check_all(self) -> DependencyReport:
         return DependencyReport(
             ffmpeg=self.check_ffmpeg(),
             whisper_model=self.check_whisper_model(),
             ollama=self.check_ollama(),
+            ytdlp=self.check_ytdlp(),
         )
 
 
