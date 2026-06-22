@@ -1,4 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ActiveUploadBanner } from "./components/ActiveUploadBanner";
+import { GlobalJobMonitor } from "./components/GlobalJobMonitor";
+import { LocaleProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
 import { CaptionEditorPage } from "./pages/CaptionEditorPage";
 import { LibraryPage } from "./pages/LibraryPage";
@@ -9,16 +12,20 @@ import { UploadPage } from "./pages/UploadPage";
 export default function App() {
   return (
     <ThemeProvider>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<UploadPage />} />
-        <Route path="/library" element={<LibraryPage />} />
-        <Route path="/edit/:videoId/:clipId" element={<CaptionEditorPage />} />
-        <Route path="/results/:videoId" element={<ResultsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<UploadPage />} />
-      </Routes>
-    </BrowserRouter>
+      <LocaleProvider>
+        <GlobalJobMonitor />
+        <BrowserRouter>
+          <ActiveUploadBanner />
+          <Routes>
+            <Route path="/" element={<UploadPage />} />
+            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/edit/:videoId/:clipId" element={<CaptionEditorPage />} />
+            <Route path="/results/:videoId" element={<ResultsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<UploadPage />} />
+          </Routes>
+        </BrowserRouter>
+      </LocaleProvider>
     </ThemeProvider>
   );
 }
