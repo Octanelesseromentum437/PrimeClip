@@ -13,9 +13,13 @@
     "windows": [
       {
         "title": "PrimeClip",
-        "width": 1100,
-        "height": 800,
-        "resizable": true
+        "width": 1200,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Nav } from "../components/Nav";
 import { deleteVideo, fetchVideos, generateClips, videoSourceUrl } from "../lib/api";
 import { getApiKey } from "../lib/credentials";
 import { loadProviders, resolveModelForProvider } from "../lib/providers";
@@ -211,15 +210,16 @@ export function LibraryPage() {
   }, [refresh]);
 
   return (
-    <div className="page-shell">
-      <Nav />
-      <main className="max-w-3xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Library</h1>
-          <Link to="/" className="link-brand">
-            Upload new video
-          </Link>
+    <div className="page-shell space-y-6">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Library</h1>
+          <p className="page-subtitle">Your uploaded videos and generated clips</p>
         </div>
+        <Link to="/" className="btn-primary shrink-0">
+          Upload new video
+        </Link>
+      </header>
 
         {loading && <p className="text-muted">Loading…</p>}
         {error && <p className="text-error">{error}</p>}
@@ -238,7 +238,6 @@ export function LibraryPage() {
             <VideoRow key={video.id} video={video} onDeleted={refresh} />
           ))}
         </div>
-      </main>
     </div>
   );
 }

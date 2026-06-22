@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Nav } from "../components/Nav";
 import { fetchHealth, testProvider } from "../lib/api";
 import {
   deleteApiKey,
@@ -108,15 +107,13 @@ export function SettingsPage() {
   const modelOptions = selected?.models ?? [];
 
   return (
-    <div className="page-shell">
-      <Nav />
-      <main className="max-w-2xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-          <span className="text-xs uppercase tracking-wide text-app-fg-subtle bg-app-muted px-2 py-1 rounded">
-            {bundleProfile} build
-          </span>
-        </div>
+    <div className="page-shell max-w-2xl space-y-6">
+      <header className="page-header">
+        <h1 className="page-title">{t("settings.title")}</h1>
+        <span className="text-xs uppercase tracking-wide text-app-fg-subtle bg-app-muted px-2 py-1 rounded-md shrink-0">
+          {bundleProfile} build
+        </span>
+      </header>
 
         <section className="card p-4 space-y-3">
           <h2 className="font-semibold">{t("settings.language")}</h2>
@@ -248,7 +245,6 @@ export function SettingsPage() {
           </div>
           {testResult && <p className="text-sm text-muted">{testResult}</p>}
         </section>
-      </main>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Nav } from "../components/Nav";
 import { getAppInfo, getBundleProfile, type AppInfo } from "../lib/credentials";
 import { useLocale } from "../lib/i18n";
 import { isTauriApp } from "../lib/tauri";
@@ -20,13 +19,11 @@ export function HelpPage() {
   const isLite = bundleProfile === "lite";
 
   return (
-    <div className="page-shell">
-      <Nav />
-      <main className="max-w-3xl mx-auto p-6 space-y-8">
-        <header className="space-y-2">
-          <h1 className="text-2xl font-bold">{t("help.title")}</h1>
-          <p className="text-app-fg-muted">{t("help.intro")}</p>
-        </header>
+    <div className="page-shell max-w-3xl space-y-6">
+      <header className="space-y-1">
+        <h1 className="page-title">{t("help.title")}</h1>
+        <p className="page-subtitle">{t("help.intro")}</p>
+      </header>
 
         <section className="card p-5 space-y-3">
           <h2 className="font-semibold text-lg">{t("help.sections.upload.title")}</h2>
@@ -128,7 +125,6 @@ export function HelpPage() {
           </Link>
           .
         </p>
-      </main>
     </div>
   );
 }

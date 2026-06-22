@@ -82,7 +82,7 @@ export function ActiveUploadBanner() {
   const link = genLink ?? "/";
 
   return (
-    <div className="bg-brand-600 text-white text-sm px-4 py-2 flex items-center justify-between gap-4">
+    <div className="shrink-0 bg-brand-600/95 text-white text-xs px-5 py-1.5 flex items-center justify-between gap-4 border-b border-brand-700/30">
       <span>{message}</span>
       {genLink && (
         <Link to={link} className="underline underline-offset-2 whitespace-nowrap hover:opacity-90">

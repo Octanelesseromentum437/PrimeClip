@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { isImportNotified, markImportNotified, notifyCompletion } from "../lib/notifications";
-import { Nav } from "../components/Nav";
 import {
   exchangeDriveCode,
   fetchDriveAuthUrl,
@@ -315,22 +314,20 @@ export function UploadPage() {
   };
 
   return (
-    <div className="page-shell">
-      <Nav />
-      <main className="max-w-2xl mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold">{t("upload.title")}</h1>
+    <div className="page-shell max-w-2xl space-y-6">
+      <header className="page-header">
+        <h1 className="page-title">{t("upload.title")}</h1>
+      </header>
 
-        <div className="flex gap-2 text-sm">
+        <div className="segmented">
           {(["file", "url", "drive"] as SourceTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => handleTabChange(tab)}
-              className={`px-3 py-1.5 rounded-lg capitalize transition-colors ${
-                sourceTab === tab
-                  ? "bg-brand-600 text-white"
-                  : "bg-app-muted hover:bg-app-muted-hover"
-              }`}
+              className={
+                sourceTab === tab ? "segmented-item segmented-item-active" : "segmented-item"
+              }
             >
               {tab === "file"
                 ? t("upload.tab.file")
@@ -587,11 +584,10 @@ export function UploadPage() {
         <button
           onClick={handleGenerate}
           disabled={!canGenerate || uploading || providersLoading}
-          className="w-full py-3 rounded-xl btn-primary"
+          className="w-full py-3 rounded-lg btn-primary"
         >
           {uploading ? t("upload.processing") : t("upload.generate")}
         </button>
-      </main>
     </div>
   );
 }

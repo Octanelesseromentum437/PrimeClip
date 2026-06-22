@@ -3,7 +3,6 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ClipCard } from "../components/ClipCard";
 import { JobProgress } from "../components/JobProgress";
-import { Nav } from "../components/Nav";
 import { cancelJob, fetchClips, fetchVideo } from "../lib/api";
 import { useLocale } from "../lib/i18n";
 import { useJobPolling } from "../hooks/useJobPolling";
@@ -64,10 +63,12 @@ export function ResultsPage() {
   }, [videoId, jobId]);
 
   return (
-    <div className="page-shell">
-      <Nav />
-      <main className="max-w-5xl mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold">{t("results.title")}</h1>
+    <div className="page-shell space-y-6">
+      <header className="page-header">
+        <h1 className="page-title">{t("results.title")}</h1>
+      </header>
+
+      <div className="space-y-6">
 
         {job && (
           <div className="space-y-3">
@@ -96,7 +97,7 @@ export function ResultsPage() {
           <p className="text-error">{job.error_message}</p>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {clips.map((clip) => (
             <ClipCard key={clip.id} clip={clip} videoId={videoId} />
           ))}
@@ -108,7 +109,7 @@ export function ResultsPage() {
             <p className="text-sm text-app-fg-subtle">{t("results.noClipsHint")}</p>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

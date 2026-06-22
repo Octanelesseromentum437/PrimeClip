@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
-import { ActiveUploadBanner } from "./components/ActiveUploadBanner";
+import { AppLayout } from "./components/AppLayout";
 import { GlobalJobMonitor } from "./components/GlobalJobMonitor";
 import { MenuBridge } from "./components/MenuBridge";
 import { syncIconShapeFromStorage } from "./lib/iconShape";
@@ -24,15 +24,16 @@ export default function App() {
         <GlobalJobMonitor />
         <BrowserRouter>
           <MenuBridge />
-          <ActiveUploadBanner />
           <Routes>
-            <Route path="/" element={<UploadPage />} />
-            <Route path="/library" element={<LibraryPage />} />
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="/edit/:videoId/:clipId" element={<CaptionEditorPage />} />
-            <Route path="/results/:videoId" element={<ResultsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<UploadPage />} />
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<UploadPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/help" element={<HelpPage />} />
+              <Route path="/results/:videoId" element={<ResultsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/edit/:videoId/:clipId" element={<CaptionEditorPage />} />
+              <Route path="*" element={<UploadPage />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </LocaleProvider>
