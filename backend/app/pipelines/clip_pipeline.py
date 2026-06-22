@@ -139,27 +139,13 @@ class ClipGenerationPipeline:
                 [c.model_dump() for c in ctx.clip_candidates],
             )
 
-            # Stage 5: Face tracking
+            # Stage 5: Probe dimensions (face tracking runs per clip during render)
             update("track_faces", 55)
-            ctx.face_frames = await asyncio.to_thread(
-                self.face_tracking.track, ctx.video_path
-            )
             ctx.source_width, ctx.source_height = await asyncio.to_thread(
                 self.ffmpeg.probe_dimensions, ctx.video_path
             )
-            self.file_store.write_json_artifact(
-                ctx.video_id,
-                "face_tracks.json",
-                [f.model_dump() for f in ctx.face_frames],
-            )
 
             # Stage 6: Render clips
-            full_crop = await asyncio.to_thread(
-                self.vertical_crop.compute_crop_path,
-                ctx.face_frames,
-                (ctx.source_width, ctx.source_height),
-            )
-
             db_clips: list[Clip] = []
             for idx, candidate in enumerate(ctx.clip_candidates):
                 pct = 55 + int((idx + 1) / max(len(ctx.clip_candidates), 1) * 40)
@@ -182,9 +168,25 @@ class ClipGenerationPipeline:
             output_dir = self.file_store.clips_output_dir(ctx.video_id)
             for db_clip, candidate in zip(db_clips, ctx.clip_candidates, strict=True):
                 try:
-                    clip_crop = self.vertical_crop.slice_for_clip(
-                        full_crop, candidate.start, candidate.end
+                    clip_faces = await asyncio.to_thread(
+                        self.face_tracking.track,
+                        ctx.video_path,
+                        sample_fps=6.0,
+                        start_sec=candidate.start,
+                        end_sec=candidate.end,
                     )
+                    self.file_store.write_json_artifact(
+                        ctx.video_id,
+                        f"clip_{db_clip.index:02d}/face_tracks.json",
+                        [f.model_dump() for f in clip_faces],
+                    )
+                    clip_crop = await asyncio.to_thread(
+                        self.vertical_crop.compute_crop_path,
+                        clip_faces,
+                        (ctx.source_width, ctx.source_height),
+                        smoothing_window=5,
+                    )
+                    clip_crop = self.vertical_crop.aggregate_median(clip_crop)
                     artifact = self.file_store.artifact_dir(ctx.video_id)
                     cap_dir = artifact / f"clip_{db_clip.index:02d}"
                     caption_files = self.captions.generate(
