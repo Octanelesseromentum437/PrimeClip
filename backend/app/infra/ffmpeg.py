@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 
 from app.infra.dependencies import DependencyResolver
+from app.infra.ffmpeg_process import ffmpeg_registry
 
 
 class FFmpegError(RuntimeError):
@@ -17,9 +18,28 @@ class FFmpegService:
     def ffmpeg(self) -> Path:
         return self.resolver.resolve_ffmpeg()
 
+    def kill_all(self) -> None:
+        ffmpeg_registry.kill_all()
+
+    @property
+    def active_process_count(self) -> int:
+        return ffmpeg_registry.active_count
+
     def run(self, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
         cmd = [str(self.ffmpeg), *args]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        ffmpeg_registry.add(proc)
+        try:
+            stdout, stderr = proc.communicate()
+        finally:
+            ffmpeg_registry.remove(proc)
+
+        result = subprocess.CompletedProcess(cmd, proc.returncode or 0, stdout, stderr)
         if check and result.returncode != 0:
             raise FFmpegError(result.stderr or result.stdout or "ffmpeg failed")
         return result
@@ -31,10 +51,24 @@ class FFmpegService:
         ffprobe_path = self.ffmpeg.with_name("ffprobe" + self.ffmpeg.suffix)
         return ffprobe_path if ffprobe_path.is_file() else None
 
+    def _run_probe(self, cmd: list[str]) -> subprocess.CompletedProcess[str]:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        ffmpeg_registry.add(proc)
+        try:
+            stdout, stderr = proc.communicate()
+        finally:
+            ffmpeg_registry.remove(proc)
+        return subprocess.CompletedProcess(cmd, proc.returncode or 0, stdout, stderr)
+
     def probe_duration(self, video_path: Path) -> float:
         ffprobe = self._resolve_ffprobe()
         if ffprobe:
-            result = subprocess.run(
+            result = self._run_probe(
                 [
                     str(ffprobe),
                     "-v",
@@ -44,10 +78,7 @@ class FFmpegService:
                     "-of",
                     "json",
                     str(video_path),
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
+                ]
             )
             if result.returncode == 0:
                 try:
@@ -56,12 +87,7 @@ class FFmpegService:
                 except (json.JSONDecodeError, KeyError, ValueError):
                     pass
 
-        probe = subprocess.run(
-            [str(self.ffmpeg), "-i", str(video_path)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        probe = self._run_probe([str(self.ffmpeg), "-i", str(video_path)])
         import re
 
         match = re.search(r"Duration: (\d+):(\d+):(\d+\.\d+)", probe.stderr)
@@ -73,7 +99,7 @@ class FFmpegService:
     def probe_dimensions(self, video_path: Path) -> tuple[int, int]:
         ffprobe = self._resolve_ffprobe()
         if ffprobe:
-            result = subprocess.run(
+            result = self._run_probe(
                 [
                     str(ffprobe),
                     "-v",
@@ -85,11 +111,10 @@ class FFmpegService:
                     "-of",
                     "json",
                     str(video_path),
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
+                ]
             )
+            if result.returncode != 0:
+                return 1920, 1080
             data = json.loads(result.stdout)
             stream = data["streams"][0]
             return int(stream["width"]), int(stream["height"])
@@ -99,7 +124,7 @@ class FFmpegService:
         ffprobe = self._resolve_ffprobe()
         if not ffprobe:
             return 0
-        result = subprocess.run(
+        result = self._run_probe(
             [
                 str(ffprobe),
                 "-v",
@@ -111,10 +136,7 @@ class FFmpegService:
                 "-of",
                 "json",
                 str(video_path),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
+            ]
         )
         if result.returncode != 0:
             return 0
