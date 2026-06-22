@@ -5,7 +5,13 @@ from app.api.deps_captions import get_clip_rerender_service
 from app.db.models import ClipVariant
 from app.db.repository import ClipRepository, ClipVariantRepository, VideoRepository
 from app.schemas.clip import ClipRecordResponse
-from app.schemas.common import Resolution, available_resolutions
+from app.schemas.common import (
+    AspectRatio,
+    Resolution,
+    available_resolution_labels,
+    parse_resolution_label,
+    resolution_label,
+)
 from app.services.captions.rerender import ClipRerenderService
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -45,27 +51,89 @@ download_router = APIRouter(prefix="/download", tags=["clips"])
 
 class QualitiesResponse(BaseModel):
     resolutions: list[str]
+    aspect_ratio: str
+
+
+def _resolve_resolution(
+    label: str | None,
+    aspect_ratio: AspectRatio,
+    source_width: int | None,
+    source_height: int | None,
+) -> Resolution:
+    if label:
+        if label in {res.value for res in Resolution}:
+            return Resolution(label)
+        return parse_resolution_label(label, aspect_ratio)
+
+    if source_width and source_height:
+        allowed = available_resolution_labels(source_width, source_height, aspect_ratio)
+        if allowed:
+            return parse_resolution_label(allowed[0], aspect_ratio)
+    return Resolution.HD
 
 
 @download_router.get("/{clip_id}/qualities", response_model=QualitiesResponse)
 def list_qualities(
     clip_id: str,
     session: Session = Depends(get_db_session),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
 ) -> QualitiesResponse:
     clip = ClipRepository(session).get(clip_id)
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
     video = VideoRepository(session).get(clip.video_id)
+    aspect_ratio = rerender_svc.load_aspect_ratio(clip.video_id)
     if not video or not video.source_width or not video.source_height:
-        return QualitiesResponse(resolutions=[Resolution.HD.value, Resolution.SD.value])
-    resolutions = [r.value for r in available_resolutions(video.source_width, video.source_height)]
-    return QualitiesResponse(resolutions=resolutions)
+        return QualitiesResponse(
+            resolutions=[
+                resolution_label(aspect_ratio, Resolution.HD),
+                resolution_label(aspect_ratio, Resolution.SD),
+            ],
+            aspect_ratio=aspect_ratio.value,
+        )
+    resolutions = available_resolution_labels(
+        video.source_width, video.source_height, aspect_ratio
+    )
+    return QualitiesResponse(resolutions=resolutions, aspect_ratio=aspect_ratio.value)
+
+
+@download_router.get("/{clip_id}/preview")
+def preview_clip(
+    clip_id: str,
+    resolution: str | None = Query(default=None),
+    session: Session = Depends(get_db_session),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+) -> FileResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    video = VideoRepository(session).get(clip.video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    aspect_ratio = rerender_svc.load_aspect_ratio(clip.video_id)
+    target = _resolve_resolution(
+        resolution,
+        aspect_ratio,
+        video.source_width,
+        video.source_height,
+    )
+
+    preview_path = rerender_svc.preview_path(clip, target)
+    if not preview_path.is_file():
+        preview_path = rerender_svc.ensure_preview(
+            clip,
+            Path(video.source_path),
+            resolution=target,
+        )
+
+    return FileResponse(preview_path, media_type="video/mp4", filename=preview_path.name)
 
 
 @download_router.get("/{clip_id}")
 def download_clip(
     clip_id: str,
-    resolution: Resolution | None = Query(default=None),
+    resolution: str | None = Query(default=None),
     session: Session = Depends(get_db_session),
     rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
 ) -> FileResponse:
@@ -73,7 +141,18 @@ def download_clip(
     if not clip:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    target = resolution or Resolution.HD
+    video = VideoRepository(session).get(clip.video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    aspect_ratio = rerender_svc.load_aspect_ratio(clip.video_id)
+    target = _resolve_resolution(
+        resolution,
+        aspect_ratio,
+        video.source_width,
+        video.source_height,
+    )
+    target_label = resolution_label(aspect_ratio, target)
     variant_repo = ClipVariantRepository(session)
 
     if target == Resolution.HD and clip.output_path and resolution is None:
@@ -81,25 +160,34 @@ def download_clip(
         if path.is_file():
             return FileResponse(path, media_type="video/mp4", filename=path.name)
 
-    variant = variant_repo.get(clip_id, target.value)
+    variant = variant_repo.get(clip_id, target_label)
+    if not variant:
+        # Backward compatibility with legacy resolution keys.
+        legacy = variant_repo.get(clip_id, target.value)
+        variant = legacy
     if variant and Path(variant.output_path).is_file():
         path = Path(variant.output_path)
         return FileResponse(path, media_type="video/mp4", filename=path.name)
 
-    video = VideoRepository(session).get(clip.video_id)
-    if not video:
-        raise HTTPException(status_code=404, detail="Video not found")
-
     if video.source_width and video.source_height:
-        allowed = {r.value for r in available_resolutions(video.source_width, video.source_height)}
-        if target.value not in allowed:
+        allowed = {
+            resolution_label(aspect_ratio, res)
+            for res in available_resolution_labels(
+                video.source_width, video.source_height, aspect_ratio
+            )
+        }
+        if target_label not in allowed:
             raise HTTPException(status_code=400, detail="Resolution exceeds source quality")
 
-    output_path = rerender_svc.rerender(clip, Path(video.source_path), resolution=target)
+    output_path = rerender_svc.rerender(
+        clip,
+        Path(video.source_path),
+        resolution=target,
+    )
     variant_repo.upsert(
         ClipVariant(
             clip_id=clip.id,
-            resolution=target.value,
+            resolution=target_label,
             output_path=str(output_path),
         )
     )
