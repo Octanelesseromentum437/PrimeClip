@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.captions import router as captions_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
-from app.api.routes.drive import drive_upload_router, router as drive_router
+from app.api.routes.drive import drive_upload_router
+from app.api.routes.drive import router as drive_router
 from app.api.routes.fonts import router as fonts_router
 from app.api.routes.jobs import jobs_router
 from app.api.routes.jobs import router as generate_router
@@ -74,3 +75,15 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run(
+        app,
+        host=settings.sidecar_host,
+        port=settings.sidecar_port,
+        log_config=None,
+    )
