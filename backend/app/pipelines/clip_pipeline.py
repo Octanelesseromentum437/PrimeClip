@@ -93,6 +93,7 @@ class ClipGenerationPipeline:
         try:
             job.started_at = datetime.now(UTC)
             job_repo.update(job)
+            self._check_cancelled(job, session)
 
             self.file_store.write_json_artifact(
                 ctx.video_id,
