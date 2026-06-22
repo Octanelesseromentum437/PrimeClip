@@ -228,7 +228,7 @@ export function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <Nav />
       <main className="max-w-2xl mx-auto p-6 space-y-6">
         <h1 className="text-2xl font-bold">Generate Clips</h1>
@@ -239,8 +239,10 @@ export function UploadPage() {
               key={tab}
               type="button"
               onClick={() => setSourceTab(tab)}
-              className={`px-3 py-1.5 rounded-lg capitalize ${
-                sourceTab === tab ? "bg-brand-600" : "bg-slate-800 hover:bg-slate-700"
+              className={`px-3 py-1.5 rounded-lg capitalize transition-colors ${
+                sourceTab === tab
+                  ? "bg-brand-600 text-white"
+                  : "bg-app-muted hover:bg-app-muted-hover"
               }`}
             >
               {tab === "file" ? "Local file" : tab === "url" ? "URL" : "Google Drive"}
@@ -252,18 +254,18 @@ export function UploadPage() {
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          className="border-2 border-dashed border-slate-700 rounded-xl p-12 text-center hover:border-brand-500 transition-colors"
+          className="border-2 border-dashed border-app-border rounded-xl p-12 text-center hover:border-brand-500 transition-colors"
         >
           {(localPath?.split(/[/\\]/).pop() ?? file?.name) ? (
             <p>{localPath?.split(/[/\\]/).pop() ?? file?.name}</p>
           ) : (
-            <p className="text-slate-400">Drag & drop a video, or</p>
+            <p className="text-muted">Drag & drop a video, or</p>
           )}
           {isTauriApp() ? (
             <button
               type="button"
               onClick={onBrowse}
-              className="mt-4 text-sm text-brand-400 hover:text-brand-300 underline underline-offset-2"
+              className="mt-4 text-sm link-brand underline underline-offset-2"
             >
               Choose video file
             </button>
@@ -280,43 +282,42 @@ export function UploadPage() {
               }}
             />
           )}
-          )}
         </div>
         )}
 
         {sourceTab === "url" && (
-          <div className="rounded-xl border border-slate-700 p-6 space-y-4">
-            <p className="text-sm text-slate-400">
+          <div className="card p-6 space-y-4">
+            <p className="text-sm text-muted">
               Paste a public YouTube, Vimeo, or Google Drive link. Respect copyright and platform terms.
             </p>
             <input
               value={importUrl}
               onChange={(e) => setImportUrl(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
-              className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm"
+              className="input p-3"
             />
             <button
               type="button"
               onClick={handleUrlImport}
               disabled={uploading || !importUrl.trim()}
-              className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
+              className="w-full btn-secondary"
             >
               {uploading ? `Downloading… ${importProgress ?? 0}%` : "Download video"}
             </button>
             {readyVideo && (
-              <p className="text-sm text-green-400">Ready: {readyVideo.filename}</p>
+              <p className="text-success">Ready: {readyVideo.filename}</p>
             )}
           </div>
         )}
 
         {sourceTab === "drive" && (
-          <div className="rounded-xl border border-slate-700 p-6 space-y-4">
+          <div className="card p-6 space-y-4">
             {!driveToken ? (
               <>
                 <button
                   type="button"
                   onClick={startDriveAuth}
-                  className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600"
+                  className="w-full btn-secondary"
                 >
                   Connect Google Drive
                 </button>
@@ -324,12 +325,12 @@ export function UploadPage() {
                   value={authCode}
                   onChange={(e) => setAuthCode(e.target.value)}
                   placeholder="Paste authorization code"
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm"
+                  className="input p-3"
                 />
                 <button
                   type="button"
                   onClick={completeDriveAuth}
-                  className="w-full py-2 rounded-lg bg-brand-600 hover:bg-brand-500"
+                  className="w-full btn-primary"
                 >
                   Complete sign-in
                 </button>
@@ -340,7 +341,7 @@ export function UploadPage() {
                   <button
                     type="button"
                     onClick={() => refreshDriveFiles()}
-                    className="px-3 py-1.5 text-sm rounded-lg bg-slate-800"
+                    className="btn-ghost"
                   >
                     Refresh files
                   </button>
@@ -351,7 +352,7 @@ export function UploadPage() {
                       setDriveToken(null);
                       setDriveFiles([]);
                     }}
-                    className="px-3 py-1.5 text-sm rounded-lg text-red-400"
+                    className="btn-ghost text-red-600 dark:text-red-400"
                   >
                     Disconnect
                   </button>
@@ -359,7 +360,7 @@ export function UploadPage() {
                 <select
                   value={selectedDriveFileId}
                   onChange={(e) => setSelectedDriveFileId(e.target.value)}
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-sm"
+                  className="input"
                 >
                   {driveFiles.map((f) => (
                     <option key={f.id} value={f.id}>
@@ -374,12 +375,12 @@ export function UploadPage() {
 
         <div className="space-y-4">
           <label className="block">
-            <span className="text-sm text-slate-400">LLM Provider</span>
+            <span className="label-muted">LLM Provider</span>
             <select
               value={kind}
               disabled={providersLoading || providers.length === 0}
               onChange={(e) => onProviderChange(e.target.value as ProviderKind)}
-              className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-2 disabled:opacity-50"
+              className="input mt-1 disabled:opacity-50"
             >
               {providers.map((p) => (
                 <option key={p.kind} value={p.kind}>
@@ -392,16 +393,16 @@ export function UploadPage() {
           </label>
 
           {providersLoading && (
-            <p className="text-sm text-slate-500">Loading providers…</p>
+            <p className="text-sm text-app-fg-subtle">Loading providers…</p>
           )}
 
           {providersError && (
-            <div className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-3 text-sm text-amber-200 space-y-2">
+            <div className="alert-warning">
               <p>{providersError}</p>
               <button
                 type="button"
                 onClick={refreshProviders}
-                className="text-amber-100 underline underline-offset-2"
+                className="underline underline-offset-2"
               >
                 Retry
               </button>
@@ -409,18 +410,18 @@ export function UploadPage() {
           )}
 
           {selected?.requires_api_key && !selected.configured && (
-            <p className="text-sm text-amber-300">
+            <p className="text-sm text-amber-600 dark:text-amber-300">
               This provider needs an API key. Add it in Settings before generating clips.
             </p>
           )}
 
           {modelOptions.length ? (
             <label className="block">
-              <span className="text-sm text-slate-400">Model</span>
+              <span className="label-muted">Model</span>
               <select
                 value={modelValue}
                 onChange={(e) => setModel(e.target.value)}
-                className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-2"
+                className="input mt-1"
               >
                 {modelOptions.map((m) => (
                   <option key={m} value={m}>
@@ -431,35 +432,35 @@ export function UploadPage() {
             </label>
           ) : (
             <label className="block">
-              <span className="text-sm text-slate-400">Model</span>
+              <span className="label-muted">Model</span>
               <input
                 value={modelValue}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder={selected?.default_model || "model name"}
-                className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-2"
+                className="input mt-1"
               />
             </label>
           )}
 
           <label className="block">
-            <span className="text-sm text-slate-400">Number of clips: {numClips}</span>
+            <span className="label-muted">Number of clips: {numClips}</span>
             <input
               type="range"
               min={1}
               max={20}
               value={numClips}
               onChange={(e) => setNumClips(Number(e.target.value))}
-              className="w-full mt-2"
+              className="w-full mt-2 accent-brand-600"
             />
           </label>
         </div>
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {error && <p className="text-error">{error}</p>}
 
         <button
           onClick={handleGenerate}
           disabled={!canGenerate || uploading || providersLoading}
-          className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 font-semibold"
+          className="w-full py-3 rounded-xl btn-primary"
         >
           {uploading ? "Processing..." : "Generate Clips"}
         </button>

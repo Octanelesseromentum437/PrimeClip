@@ -32,7 +32,7 @@ export function ResultsPage() {
   }, [job?.status, notified, videoId]);
 
   return (
-    <div className="min-h-screen">
+    <div className="page-shell">
       <Nav />
       <main className="max-w-5xl mx-auto p-6 space-y-6">
         <h1 className="text-2xl font-bold">Results</h1>
@@ -46,7 +46,7 @@ export function ResultsPage() {
         )}
 
         {job?.error_message && (
-          <p className="text-red-400 text-sm">{job.error_message}</p>
+          <p className="text-error">{job.error_message}</p>
         )}
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -56,7 +56,7 @@ export function ResultsPage() {
         </div>
 
         {job?.status === "completed" && clips.length === 0 && (
-          <p className="text-slate-400">No clips generated.</p>
+          <p className="text-muted">No clips generated.</p>
         )}
       </main>
     </div>

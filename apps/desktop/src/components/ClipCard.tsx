@@ -27,13 +27,15 @@ export function ClipCard({ clip, videoId }: Props) {
   }, [clip.id, resolution]);
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 flex flex-col gap-3">
+    <div className="card p-4 flex flex-col gap-3">
       <div className="flex justify-between items-start">
         <h3 className="font-semibold text-lg">{clip.title}</h3>
-        <span className="text-brand-500 font-mono text-sm">{clip.score.toFixed(1)}</span>
+        <span className="text-brand-600 dark:text-brand-500 font-mono text-sm">
+          {clip.score.toFixed(1)}
+        </span>
       </div>
-      <p className="text-sm text-slate-400 line-clamp-2">{clip.reason}</p>
-      <p className="text-xs text-slate-500">
+      <p className="text-sm text-app-fg-muted line-clamp-2">{clip.reason}</p>
+      <p className="text-xs text-app-fg-subtle">
         {clip.start_sec.toFixed(0)}s – {clip.end_sec.toFixed(0)}s · {clip.status}
       </p>
       {clip.status === "ready" && downloadUrl && (
@@ -49,19 +51,19 @@ export function ClipCard({ clip, videoId }: Props) {
       {clip.status === "ready" && videoId && (
         <Link
           to={`/edit/${videoId}/${clip.id}`}
-          className="text-center py-2 rounded-lg border border-slate-700 hover:border-brand-500 text-sm font-medium"
+          className="text-center py-2 rounded-lg border border-app-border hover:border-brand-500 text-sm font-medium transition-colors"
         >
           Edit captions
         </Link>
       )}
       {clip.status === "ready" && downloadUrl && qualities.length > 0 && (
         <div className="space-y-2">
-          <label className="block text-xs text-slate-400">
+          <label className="block label-xs">
             Quality
             <select
               value={resolution}
               onChange={(e) => setResolution(e.target.value)}
-              className="mt-1 w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-sm"
+              className="input mt-1"
             >
               {qualities.map((q) => (
                 <option key={q} value={q}>
@@ -73,7 +75,7 @@ export function ClipCard({ clip, videoId }: Props) {
           <a
             href={downloadUrl}
             download
-            className="block text-center py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-sm font-medium"
+            className="block text-center btn-primary text-sm font-medium"
           >
             Download
           </a>
