@@ -55,7 +55,7 @@ function formatFetchError(err: unknown): string {
   if (err instanceof TypeError) {
     const message = err.message.toLowerCase();
     if (message.includes("load failed") || message.includes("failed to fetch")) {
-      return "Could not reach the PrimeClip API. Run `make dev-api` in another terminal.";
+      return "Could not reach the PrimeClip API. In dev, run `make dev-api`. In a release build, try restarting the app.";
     }
   }
   return err instanceof Error ? err.message : "Network request failed";

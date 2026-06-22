@@ -81,7 +81,7 @@ export async function loadProviders(): Promise<{
     const message =
       err instanceof Error
         ? err.message
-        : "Could not reach the PrimeClip API. Run `make dev-api` in another terminal.";
+        : "Could not reach the PrimeClip API. In dev, run `make dev-api`. In a release build, try restarting the app.";
     return { providers: FALLBACK_PROVIDERS, error: message };
   }
 }
