@@ -53,7 +53,7 @@ export function ActiveUploadBanner() {
           } else {
             setGenPct(null);
             setGenLink(null);
-            if (job.status === "completed" || job.status === "failed") {
+            if (job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
               patchUploadSession({ activeGeneration: null });
             }
           }
