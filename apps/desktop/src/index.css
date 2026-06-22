@@ -353,6 +353,10 @@
       disabled:opacity-40;
   }
 
+  .editor-control-btn-label {
+    @apply w-auto min-w-[2.25rem] rounded-md px-2 text-[10px] font-semibold uppercase tracking-wide;
+  }
+
   .editor-time {
     @apply text-[11px] text-app-fg-muted min-w-[2.5rem];
   }
@@ -461,5 +465,179 @@
 
   .caption-playhead-line {
     @apply absolute top-0 bottom-0 left-0 w-px bg-rose-500;
+  }
+
+  /* ── Multi-track clip timeline ── */
+  .clip-timeline {
+    @apply shrink-0 flex flex-col border-t border-app-border bg-app-surface;
+    height: 380px;
+  }
+
+  .clip-timeline-toolbar {
+    @apply shrink-0 flex items-center justify-between px-4 py-1.5 border-b border-app-border;
+  }
+
+  .clip-timeline-scroll {
+    @apply flex-1 overflow-x-auto overflow-y-auto;
+  }
+
+  .clip-timeline-inner {
+    @apply relative min-h-full pb-2;
+  }
+
+  .clip-timeline-tracks {
+    @apply relative;
+  }
+
+  .caption-playhead-tracks {
+    @apply absolute top-0 bottom-0 pointer-events-none z-20;
+    left: calc(88px + 0.25rem);
+  }
+
+  .clip-timeline-transport {
+    @apply shrink-0 flex items-center gap-3 px-4 py-2 border-t border-app-border bg-app-surface-muted;
+  }
+
+  .clip-timeline-transport-controls {
+    @apply flex items-center gap-1;
+  }
+
+  .clip-timeline-transport-edit {
+    @apply pl-2 ml-1 border-l border-app-border;
+  }
+
+  .clip-timeline-shortcuts {
+    @apply ml-auto;
+  }
+
+  .timeline-track-row {
+    @apply flex items-stretch pt-1;
+  }
+
+  .timeline-track-label {
+    @apply shrink-0 flex items-center px-3 text-[10px] font-medium uppercase
+      tracking-wider text-app-fg-subtle border-r border-app-border;
+    width: 88px;
+  }
+
+  .timeline-track {
+    @apply relative h-10 rounded-md mx-1 bg-app-muted;
+  }
+
+  .timeline-track--media {
+    height: 48px;
+  }
+
+  .timeline-block {
+    @apply absolute top-0.5 bottom-0.5 rounded-[4px] overflow-hidden cursor-grab
+      border transition-colors text-left;
+  }
+
+  .timeline-block-label {
+    @apply relative z-[2] block px-2 pt-1 text-[10px] text-white truncate
+      pointer-events-none select-none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  }
+
+  .timeline-filmstrip {
+    @apply absolute inset-0 flex overflow-hidden pointer-events-none z-0;
+  }
+
+  .timeline-filmstrip-frame {
+    @apply h-full object-cover flex-shrink-0;
+  }
+
+  .timeline-filmstrip-fallback {
+    @apply absolute inset-0 pointer-events-none z-0
+      bg-gradient-to-r from-white/5 via-white/10 to-white/5;
+  }
+
+  .timeline-waveform-canvas {
+    @apply absolute inset-0 z-0 pointer-events-none;
+  }
+
+  .timeline-waveform-canvas--failed {
+    @apply opacity-0;
+  }
+
+  .timeline-block-video,
+  .timeline-block-broll {
+    @apply bg-slate-900/40 border-slate-400/40;
+  }
+
+  .timeline-block-video-audio,
+  .timeline-block-audio {
+    @apply bg-emerald-950/40 border-emerald-400/40;
+  }
+
+  .timeline-block-dragging,
+  .timeline-block:active {
+    @apply cursor-grabbing;
+  }
+
+  .timeline-block-selected {
+    @apply ring-2 ring-app-fg z-10;
+  }
+
+  .timeline-block-handle {
+    @apply absolute top-0 bottom-0 w-1.5 cursor-col-resize opacity-0 hover:opacity-100
+      bg-white/50 transition-opacity;
+  }
+
+  .timeline-block-handle-start {
+    @apply left-0 rounded-l;
+  }
+
+  .timeline-block-handle-end {
+    @apply right-0 rounded-r;
+  }
+
+  .timeline-block-selected .timeline-block-handle {
+    @apply opacity-100;
+  }
+
+  .timeline-block-image {
+    @apply bg-gradient-to-b from-violet-500/85 to-violet-700/85 border-violet-400/40;
+  }
+
+  .timeline-block-caption {
+    @apply bg-gradient-to-b from-brand-500/85 to-brand-700/85 border-brand-400/40;
+  }
+
+  .timeline-track-row--visual-front .timeline-track {
+    @apply bg-sky-950/20;
+  }
+
+  .timeline-track-row--visual-mid .timeline-track {
+    @apply bg-violet-950/15;
+  }
+
+  .timeline-track-row--visual-back .timeline-track {
+    @apply bg-slate-950/20;
+  }
+
+  .timeline-track-row--audio-video .timeline-track,
+  .timeline-track-row--audio-music .timeline-track {
+    @apply bg-emerald-950/15;
+  }
+
+  .editor-inspector-empty {
+    @apply p-2;
+  }
+
+  .editor-player-overlay {
+    @apply pointer-events-none absolute object-cover z-[5];
+  }
+
+  .editor-player-overlay--image {
+    @apply pointer-events-auto cursor-grab select-none;
+  }
+
+  .editor-player-overlay--image:active {
+    @apply cursor-grabbing;
+  }
+
+  .editor-player-overlay--selected {
+    @apply ring-2 ring-brand-400;
   }
 }
