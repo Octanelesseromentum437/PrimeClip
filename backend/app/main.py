@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.captions import router as captions_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
 from app.api.routes.jobs import jobs_router
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(generate_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
     app.include_router(clips_router, prefix="/api")
+    app.include_router(captions_router, prefix="/api")
     app.include_router(download_router, prefix="/api")
     app.include_router(providers_router, prefix="/api")
 

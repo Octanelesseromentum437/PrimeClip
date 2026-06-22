@@ -54,9 +54,21 @@ class JobRunner:
         provider_config: ProviderConfig,
         num_clips: int,
         language: str | None = None,
+        caption_style: "CaptionStyleName | None" = None,
+        words_per_screen: int | None = None,
     ) -> None:
+        from app.schemas.common import CaptionStyleName
+
         task = asyncio.create_task(
-            self._run_job(job_id, video_id, provider_config, num_clips, language)
+            self._run_job(
+                job_id,
+                video_id,
+                provider_config,
+                num_clips,
+                language,
+                caption_style or CaptionStyleName.REELS,
+                words_per_screen,
+            )
         )
         self._running[job_id] = task
         task.add_done_callback(lambda _: self._running.pop(job_id, None))
@@ -68,7 +80,11 @@ class JobRunner:
         provider_config: ProviderConfig,
         num_clips: int,
         language: str | None,
+        caption_style: "CaptionStyleName",
+        words_per_screen: int | None,
     ) -> None:
+        from app.schemas.common import CaptionStyleName
+
         with Session(get_engine()) as session:
             job_repo = JobRepository(session)
             video_repo = VideoRepository(session)
@@ -84,6 +100,8 @@ class JobRunner:
                 language=language or video.language,
                 provider_config=provider_config,
                 num_clips=num_clips,
+                caption_style=caption_style,
+                words_per_screen=words_per_screen,
             )
             await self.pipeline.run(ctx, job, session)
 

@@ -12,6 +12,7 @@ from app.pipelines.context import PipelineContext
 from app.providers.registry import ProviderRegistry
 from app.schemas.clip import ClipSelectionRequest
 from app.schemas.common import CaptionStyleName, ClipStatus, JobStatus
+from app.schemas.caption import STYLE_PRESETS
 from app.services.audio.extract import AudioExtractService
 from app.services.captions.generator import CaptionService
 from app.services.face_tracking.mediapipe_tracker import FaceTrackingService
@@ -192,8 +193,15 @@ class ClipGenerationPipeline:
                     caption_files = self.captions.generate(
                         ctx.transcript,
                         (candidate.start, candidate.end),
-                        CaptionStyleName.REELS,
+                        ctx.caption_style,
                         cap_dir,
+                        style_override=(
+                            STYLE_PRESETS[ctx.caption_style].model_copy(
+                                update={"words_per_screen": ctx.words_per_screen}
+                            )
+                            if ctx.words_per_screen
+                            else None
+                        ),
                     )
                     motion_plan = self.motion.plan(candidate, ctx.transcript)
                     output_path = output_dir / f"clip_{db_clip.index:02d}.mp4"
