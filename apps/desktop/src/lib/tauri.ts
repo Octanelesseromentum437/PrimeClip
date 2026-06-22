@@ -17,3 +17,10 @@ export async function pickVideoFile(): Promise<string | null> {
   });
   return typeof selected === "string" ? selected : null;
 }
+
+export async function openFileFolder(filePath: string): Promise<void> {
+  if (!isTauriApp()) return;
+  const { open } = await import("@tauri-apps/plugin-shell");
+  const dir = filePath.replace(/[/\\][^/\\]+$/, "");
+  await open(dir);
+}
