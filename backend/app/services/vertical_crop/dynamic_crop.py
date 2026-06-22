@@ -125,3 +125,35 @@ class VerticalCropService:
             source_height=crop_path.source_height,
             target_aspect=crop_path.target_aspect,
         )
+
+    def center_crop_path(
+        self,
+        source_size: tuple[int, int],
+        target_aspect: tuple[int, int] = (16, 9),
+    ) -> CropPath:
+        source_width, source_height = source_size
+        target_w, target_h = target_aspect
+        aspect = target_w / target_h
+
+        crop_h = 1.0
+        crop_w = crop_h * aspect * (source_height / source_width)
+        if crop_w > 1.0:
+            crop_w = 1.0
+            crop_h = crop_w / aspect * (source_width / source_height)
+
+        x = max(0.0, (1.0 - crop_w) / 2)
+        y = max(0.0, (1.0 - crop_h) / 2)
+
+        keyframe = CropKeyframe(
+            timestamp=0.0,
+            x=x,
+            y=y,
+            width=crop_w,
+            height=crop_h,
+        )
+        return CropPath(
+            keyframes=[keyframe],
+            source_width=source_width,
+            source_height=source_height,
+            target_aspect=target_aspect,
+        )
