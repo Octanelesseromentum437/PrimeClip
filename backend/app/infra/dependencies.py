@@ -148,7 +148,10 @@ class DependencyResolver:
 
         service = UrlImportService(self.settings)
         if service.check_available():
-            return DependencyStatus(name="ytdlp", ok=True, message="yt-dlp available")
+            message = "yt-dlp available"
+            if not service.check_js_runtime():
+                message += " (install Deno or Node for reliable YouTube imports)"
+            return DependencyStatus(name="ytdlp", ok=True, message=message)
         return DependencyStatus(
             name="ytdlp",
             ok=False,
