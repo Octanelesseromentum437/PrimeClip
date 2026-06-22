@@ -2,7 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+@layer base {
+  :root {
+    --app-bg: 248 250 252;
+    --app-surface: 255 255 255;
+    --app-surface-muted: 241 245 249;
+    --app-input: 255 255 255;
+    --app-muted: 241 245 249;
+    --app-muted-hover: 226 232 240;
+    --app-border: 226 232 240;
+    --app-nav: 255 255 255;
+    --app-fg: 15 23 42;
+    --app-fg-muted: 100 116 139;
+    --app-fg-subtle: 148 163 184;
+  }
+
+  .dark {
+    --app-bg: 2 6 23;
+    --app-surface: 15 23 42;
+    --app-surface-muted: 15 23 42;
+    --app-input: 2 6 23;
+    --app-muted: 30 41 59;
+    --app-muted-hover: 51 65 85;
+    --app-border: 30 41 59;
+    --app-nav: 15 23 42;
+    --app-fg: 241 245 249;
+    --app-fg-muted: 148 163 184;
+    --app-fg-subtle: 100 116 139;
+  }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    @apply bg-app-bg text-app-fg antialiased;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply min-h-screen bg-app-bg text-app-fg;
+  }
+
+  .card {
+    @apply rounded-xl border border-app-border bg-app-surface;
+  }
+
+  .card-muted {
+    @apply rounded-xl border border-app-border bg-app-surface/80;
+  }
+
+  .input {
+    @apply w-full rounded-lg bg-app-input border border-app-border p-2 text-sm text-app-fg
+      focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500;
+  }
+
+  .input-sm {
+    @apply w-full rounded bg-app-input border border-app-border p-1.5 text-sm text-app-fg
+      focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500;
+  }
+
+  .label-muted {
+    @apply text-sm text-app-fg-muted;
+  }
+
+  .label-xs {
+    @apply text-xs text-app-fg-muted;
+  }
+
+  .btn-ghost {
+    @apply px-3 py-1.5 text-sm rounded-lg bg-app-muted hover:bg-app-muted-hover transition-colors;
+  }
+
+  .btn-secondary {
+    @apply py-2 rounded-lg bg-app-muted hover:bg-app-muted-hover font-medium disabled:opacity-50
+      transition-colors;
+  }
+
+  .btn-primary {
+    @apply py-2 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 font-semibold
+      text-white transition-colors;
+  }
+
+  .btn-outline {
+    @apply py-2 rounded-lg border border-app-border hover:bg-app-muted text-sm transition-colors;
+  }
+
+  .link-brand {
+    @apply text-sm text-brand-600 dark:text-brand-400 hover:underline;
+  }
+
+  .text-error {
+    @apply text-red-600 dark:text-red-400 text-sm;
+  }
+
+  .text-success {
+    @apply text-sm text-green-600 dark:text-green-400;
+  }
+
+  .text-muted {
+    @apply text-app-fg-muted;
+  }
+
+  .alert-warning {
+    @apply rounded-lg border border-amber-300 dark:border-amber-800/60 bg-amber-50
+      dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200 space-y-2;
+  }
+
+  .nav-bar {
+    @apply border-b border-app-border bg-app-nav/90 backdrop-blur-sm px-4 lg:px-6 py-3 flex
+      items-center justify-between shrink-0;
+  }
+
+  .panel-header {
+    @apply shrink-0 px-4 py-2.5 border-b border-app-border flex items-center justify-between;
+  }
+
+  .chip {
+    @apply px-3 py-1.5 text-sm rounded-lg border border-app-border bg-app-surface
+      hover:bg-app-muted transition-colors;
+  }
+
+  .chip-active {
+    @apply px-3 py-1.5 text-sm rounded-lg border border-brand-600 bg-brand-600/10
+      text-brand-700 dark:text-brand-300 font-medium;
+  }
 }
