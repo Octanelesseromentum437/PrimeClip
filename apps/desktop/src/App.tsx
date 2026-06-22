@@ -7,6 +7,7 @@ import { syncIconShapeFromStorage } from "./lib/iconShape";
 import { LocaleProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
 import { CaptionEditorPage } from "./pages/CaptionEditorPage";
+import { HelpPage } from "./pages/HelpPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -27,6 +28,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<UploadPage />} />
             <Route path="/library" element={<LibraryPage />} />
+            <Route path="/help" element={<HelpPage />} />
             <Route path="/edit/:videoId/:clipId" element={<CaptionEditorPage />} />
             <Route path="/results/:videoId" element={<ResultsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
