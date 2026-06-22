@@ -8,6 +8,7 @@ from app.api.routes.captions import router as captions_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
 from app.api.routes.drive import drive_upload_router, router as drive_router
+from app.api.routes.fonts import router as fonts_router
 from app.api.routes.jobs import jobs_router
 from app.api.routes.jobs import router as generate_router
 from app.api.routes.providers import health_router
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(clips_router, prefix="/api")
     app.include_router(captions_router, prefix="/api")
     app.include_router(download_router, prefix="/api")
+    app.include_router(fonts_router, prefix="/api")
     app.include_router(providers_router, prefix="/api")
 
     return app
