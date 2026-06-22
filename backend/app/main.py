@@ -5,9 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.captions import router as captions_router
-from app.api.routes.drive import drive_upload_router, router as drive_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
+from app.api.routes.drive import drive_upload_router
+from app.api.routes.drive import router as drive_router
 from app.api.routes.jobs import jobs_router
 from app.api.routes.jobs import router as generate_router
 from app.api.routes.providers import health_router
@@ -17,6 +18,7 @@ from app.api.routes.url_import import router as url_import_router
 from app.api.routes.videos import router as videos_router
 from app.config import get_settings
 from app.db.session import init_db
+from app.infra.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,16 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     settings = get_settings()
     init_db(settings)
+    log_file = setup_logging(settings)
+    if log_file:
+        logger.info("Logging to %s", log_file)
     logger.info("PrimeClip API started (profile=%s)", settings.bundle_profile.value)
     yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    setup_logging(settings)
     app = FastAPI(
         title="PrimeClip API",
         version="0.1.0",

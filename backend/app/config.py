@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     ffmpeg_path: str = ""
     bundle_profile: BundleProfile = BundleProfile.LITE
     primeclip_debug: bool = False
+    log_level: str = ""
+    log_to_file: bool = True
     scene_threshold: float = 0.3
     scene_min_len_sec: float = 2.0
     ytdlp_path: str = ""
@@ -29,6 +31,10 @@ class Settings(BaseSettings):
     ytdlp_cookies_file: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
+
+    @property
+    def logs_dir(self) -> Path:
+        return self.output_dir / "logs"
 
     @property
     def uploads_dir(self) -> Path:
