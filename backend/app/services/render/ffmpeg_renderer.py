@@ -9,6 +9,7 @@ from app.schemas.render import RenderRequest, RenderResult
 
 class RenderService:
     RESOLUTIONS = {
+        Resolution.UHD: (2160, 3840),
         Resolution.HD: (1080, 1920),
         Resolution.SD: (720, 1280),
     }

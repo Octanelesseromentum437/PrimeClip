@@ -43,11 +43,18 @@ def _register_uploaded_video(
     if normalized != path:
         path = normalized
 
+    try:
+        source_width, source_height = ffmpeg.probe_dimensions(path)
+    except Exception:
+        source_width, source_height = None, None
+
     video = Video(
         id=video_id,
         filename=filename,
         source_path=str(path),
         duration_sec=duration,
+        source_width=source_width,
+        source_height=source_height,
     )
     VideoRepository(session).create(video)
     return UploadResponse(video_id=video_id, filename=filename, duration_sec=duration)

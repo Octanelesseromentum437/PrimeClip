@@ -22,6 +22,11 @@ def _build_summary(session: Session, video) -> VideoSummary:
         latest_job_status=latest_job.status if latest_job else None,
         latest_job_id=latest_job.id if latest_job else None,
         clip_count=clip_count,
+        source_resolution=(
+            f"{video.source_width}x{video.source_height}"
+            if video.source_width and video.source_height
+            else None
+        ),
     )
 
 
