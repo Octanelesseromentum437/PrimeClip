@@ -1,4 +1,6 @@
 from pathlib import Path
+import shutil
+import uuid
 
 from app.api.deps import get_db_session
 from app.api.deps_captions import get_clip_rerender_service
@@ -10,7 +12,8 @@ from app.schemas.caption import (
 )
 from app.schemas.common import CaptionStyleName, ClipStatus
 from app.services.captions.rerender import ClipRerenderService
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlmodel import Session
 
@@ -21,6 +24,16 @@ class RerenderResponse(BaseModel):
     clip_id: str
     output_path: str
     status: str
+
+
+class MediaUploadResponse(BaseModel):
+    asset: str
+    label: str
+    url: str
+
+
+class LocalMediaRequest(BaseModel):
+    path: str
 
 
 @router.get("/{clip_id}/captions", response_model=CaptionEditResponse)
@@ -109,6 +122,80 @@ def rerender_clip(
         output_path=str(output_path),
         status=clip.status,
     )
+
+
+def _save_editor_asset(
+    clip,
+    rerender_svc: ClipRerenderService,
+    source: Path,
+    original_name: str,
+) -> MediaUploadResponse:
+    assets_dir = rerender_svc.assets_dir(clip)
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = Path(original_name).name.replace(" ", "_")
+    asset_name = f"{uuid.uuid4().hex[:10]}_{safe_name}"
+    dest = assets_dir / asset_name
+    shutil.copy2(source, dest)
+    return MediaUploadResponse(
+        asset=asset_name,
+        label=Path(original_name).stem,
+        url=f"/api/clips/{clip.id}/media/{asset_name}",
+    )
+
+
+@router.post("/{clip_id}/media", response_model=MediaUploadResponse)
+async def upload_editor_media(
+    clip_id: str,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_db_session),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+) -> MediaUploadResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    filename = file.filename or "asset.bin"
+    tmp = rerender_svc.assets_dir(clip) / f"_tmp_{uuid.uuid4().hex}"
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    data = await file.read()
+    tmp.write_bytes(data)
+    try:
+        return _save_editor_asset(clip, rerender_svc, tmp, filename)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@router.post("/{clip_id}/media/local", response_model=MediaUploadResponse)
+def upload_editor_media_local(
+    clip_id: str,
+    body: LocalMediaRequest,
+    session: Session = Depends(get_db_session),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+) -> MediaUploadResponse:
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    source = Path(body.path).expanduser().resolve()
+    if not source.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return _save_editor_asset(clip, rerender_svc, source, source.name)
+
+
+@router.get("/{clip_id}/media/{asset}")
+def serve_editor_media(
+    clip_id: str,
+    asset: str,
+    session: Session = Depends(get_db_session),
+    rerender_svc: ClipRerenderService = Depends(get_clip_rerender_service),
+):
+    clip = ClipRepository(session).get(clip_id)
+    if not clip:
+        raise HTTPException(status_code=404, detail="Clip not found")
+    if ".." in asset or "/" in asset or "\\" in asset:
+        raise HTTPException(status_code=400, detail="Invalid asset name")
+    path = rerender_svc.assets_dir(clip) / asset
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return FileResponse(path)
 
 
 def _detect_preset(style) -> CaptionStyleName | None:
