@@ -124,6 +124,10 @@ export async function fetchJob(jobId: string): Promise<JobStatus> {
   return request(`/api/jobs/${jobId}`);
 }
 
+export async function cancelJob(jobId: string): Promise<JobStatus> {
+  return request(`/api/jobs/${jobId}/cancel`, { method: "POST" });
+}
+
 export async function fetchClips(videoId: string): Promise<ClipRecord[]> {
   const data = await request<{ clips: ClipRecord[] }>(`/api/clips/${videoId}`);
   return data.clips;
