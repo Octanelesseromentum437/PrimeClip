@@ -112,11 +112,18 @@ export async function generateClips(
   provider: ProviderConfig,
   numClips: number,
   language?: string,
+  aspectRatio?: "9:16" | "16:9",
 ): Promise<{ job_id: string }> {
   return request("/api/generate-clips", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ video_id: videoId, provider, num_clips: numClips, language }),
+    body: JSON.stringify({
+      video_id: videoId,
+      provider,
+      num_clips: numClips,
+      language,
+      aspect_ratio: aspectRatio ?? "9:16",
+    }),
   });
 }
 
@@ -139,9 +146,23 @@ export async function clipDownloadUrl(clipId: string, resolution?: string): Prom
   return `${base}/api/download/${clipId}${params}`;
 }
 
-export async function fetchClipQualities(clipId: string): Promise<string[]> {
-  const data = await request<{ resolutions: string[] }>(`/api/download/${clipId}/qualities`);
-  return data.resolutions;
+export async function fetchClipQualities(
+  clipId: string,
+): Promise<{ resolutions: string[]; aspect_ratio: string }> {
+  return request<{ resolutions: string[]; aspect_ratio: string }>(
+    `/api/download/${clipId}/qualities`,
+  );
+}
+
+export async function clipPreviewUrl(clipId: string, resolution?: string): Promise<string> {
+  const base = await resolveApiBase();
+  const params = resolution ? `?resolution=${encodeURIComponent(resolution)}` : "";
+  return `${base}/api/download/${clipId}/preview${params}`;
+}
+
+export async function fetchSystemFonts(): Promise<string[]> {
+  const data = await request<{ fonts: string[] }>("/api/fonts");
+  return data.fonts;
 }
 
 export async function fetchVideos(): Promise<VideoSummary[]> {
