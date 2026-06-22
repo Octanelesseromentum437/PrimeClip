@@ -81,3 +81,27 @@ def get_job(job_id: str, session: Session = Depends(get_db_session)) -> JobStatu
         current_stage=job.current_stage,
         error_message=job.error_message,
     )
+
+
+@jobs_router.post("/{job_id}/cancel", response_model=JobStatusResponse)
+def cancel_job(
+    job_id: str,
+    session: Session = Depends(get_db_session),
+    runner: JobRunner = Depends(get_job_runner),
+) -> JobStatusResponse:
+    job = JobRepository(session).get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.status not in (JobStatus.QUEUED.value, JobStatus.RUNNING.value):
+        raise HTTPException(status_code=409, detail="Job cannot be cancelled")
+
+    runner.cancel(job_id, session)
+    session.refresh(job)
+    return JobStatusResponse(
+        id=job.id,
+        video_id=job.video_id,
+        status=job.status,
+        progress_pct=job.progress_pct,
+        current_stage=job.current_stage,
+        error_message=job.error_message,
+    )
