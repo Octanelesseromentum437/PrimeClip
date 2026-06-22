@@ -62,6 +62,29 @@ def parse_clip_candidates(
     return candidates[:num_clips]
 
 
+def resolve_clip_candidates(
+    parsed: list[ClipCandidate],
+    *,
+    transcript: list[TranscriptSegment],
+    scenes: list[Scene],
+    duration_sec: float,
+    num_clips: int,
+    min_clip_sec: float = 30,
+    max_clip_sec: float = 90,
+) -> list[ClipCandidate]:
+    """Use heuristic fallback when LLM returns no valid candidates."""
+    if parsed:
+        return parsed
+    return fallback_heuristic_clips(
+        transcript,
+        scenes,
+        duration_sec=duration_sec,
+        num_clips=num_clips,
+        min_clip_sec=min_clip_sec,
+        max_clip_sec=max_clip_sec,
+    )
+
+
 def fallback_heuristic_clips(
     transcript: list[TranscriptSegment],
     scenes: list[Scene],

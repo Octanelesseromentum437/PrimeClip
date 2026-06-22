@@ -1,7 +1,7 @@
 import time
 
 from app.config import Settings
-from app.providers.json_utils import fallback_heuristic_clips, parse_clip_candidates
+from app.providers.json_utils import fallback_heuristic_clips, parse_clip_candidates, resolve_clip_candidates
 from app.providers.ollama import build_clip_prompt
 from app.schemas.clip import ClipCandidate, ClipSelectionRequest
 from app.schemas.provider import ProviderConfig, ProviderHealth, ProviderKind
@@ -62,10 +62,19 @@ class OpenAICompatibleProvider:
                     response_format={"type": "json_object"},
                 )
                 content = response.choices[0].message.content or "[]"
-                return parse_clip_candidates(
+                parsed = parse_clip_candidates(
                     content,
                     duration_sec=request.duration_sec,
                     num_clips=request.num_clips,
+                )
+                return resolve_clip_candidates(
+                    parsed,
+                    transcript=request.transcript,
+                    scenes=request.scenes,
+                    duration_sec=request.duration_sec,
+                    num_clips=request.num_clips,
+                    min_clip_sec=request.min_clip_sec,
+                    max_clip_sec=request.max_clip_sec,
                 )
             except Exception:
                 import asyncio

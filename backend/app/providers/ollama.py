@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 
 import httpx
-from app.providers.json_utils import fallback_heuristic_clips, parse_clip_candidates
+from app.providers.json_utils import fallback_heuristic_clips, parse_clip_candidates, resolve_clip_candidates
 from app.schemas.clip import ClipCandidate, ClipSelectionRequest
 from app.schemas.provider import ProviderConfig, ProviderHealth, ProviderKind
 from app.schemas.transcript import TranscriptSegment
@@ -73,10 +73,19 @@ class OllamaProvider:
                     resp = await client.post(f"{base_url}/api/chat", json=payload)
                     resp.raise_for_status()
                     content = resp.json()["message"]["content"]
-                return parse_clip_candidates(
+                parsed = parse_clip_candidates(
                     content,
                     duration_sec=request.duration_sec,
                     num_clips=request.num_clips,
+                )
+                return resolve_clip_candidates(
+                    parsed,
+                    transcript=request.transcript,
+                    scenes=request.scenes,
+                    duration_sec=request.duration_sec,
+                    num_clips=request.num_clips,
+                    min_clip_sec=request.min_clip_sec,
+                    max_clip_sec=request.max_clip_sec,
                 )
             except Exception:
                 import asyncio
