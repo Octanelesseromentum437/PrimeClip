@@ -10,6 +10,9 @@ export function Nav() {
         <Link to="/" className="hover:text-brand-500">
           Upload
         </Link>
+        <Link to="/library" className="hover:text-brand-500">
+          Library
+        </Link>
         <Link to="/settings" className="hover:text-brand-500">
           Settings
         </Link>
