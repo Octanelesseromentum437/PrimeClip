@@ -13,6 +13,7 @@ from app.schemas.render import RenderRequest
 from app.schemas.transcript import TranscriptSegment
 from app.services.captions.edit_store import CaptionEditStore
 from app.services.captions.generator import CaptionService
+from app.services.captions.timeline_renderer import TimelineRenderService
 from app.services.face_tracking.mediapipe_tracker import FaceTrackingService
 from app.services.motion.planner import MotionService
 from app.services.render.ffmpeg_renderer import RenderService
@@ -38,6 +39,7 @@ class ClipRerenderService:
         self.motion = motion
         self.render = render
         self.edit_store = CaptionEditStore()
+        self.timeline_render = TimelineRenderService(ffmpeg)
 
     def load_transcript(self, video_id: str) -> list[TranscriptSegment]:
         raw = self.file_store.read_json_artifact(video_id, "transcript.json")
@@ -73,6 +75,15 @@ class ClipRerenderService:
             preset,
             edit_path,
         )
+
+    def assets_dir(self, clip: Clip) -> Path:
+        return self.file_store.artifact_dir(clip.video_id) / f"clip_{clip.index:02d}" / "editor_assets"
+
+    def _has_timeline_edits(self, state: CaptionEditState) -> bool:
+        tl = state.timeline
+        if tl.trim.start > 0 or tl.trim.end is not None:
+            return True
+        return bool(tl.overlays or tl.audio)
 
     def save_edit_state(self, clip: Clip, state: CaptionEditState) -> None:
         artifact = self.file_store.artifact_dir(clip.video_id)
@@ -208,35 +219,65 @@ class ClipRerenderService:
         output_dir = self.file_store.clips_output_dir(clip.video_id)
         output_path = self._output_path(output_dir, clip.index, resolution, aspect_ratio)
 
-        self.render.render(
-            RenderRequest(
+        if self._has_timeline_edits(state):
+            self.timeline_render.render_with_timeline(
                 source_video=source_video,
-                clip=candidate,
+                clip_start=clip.start_sec,
+                clip_end=clip.end_sec,
                 crop_path=crop_path,
-                caption_ass=caption_files.ass,
-                motion_plan=motion_plan,
-                output_path=output_path,
-                resolution=resolution,
                 aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                timeline=state.timeline,
+                assets_dir=self.assets_dir(clip),
+                caption_ass=caption_files.ass,
+                output_path=output_path,
                 burn_captions=True,
             )
-        )
-
-        # Refresh caption-free preview alongside final render.
-        preview_path = self.preview_path(clip, resolution)
-        if preview_path != output_path:
+        else:
             self.render.render(
                 RenderRequest(
                     source_video=source_video,
                     clip=candidate,
                     crop_path=crop_path,
+                    caption_ass=caption_files.ass,
                     motion_plan=motion_plan,
-                    output_path=preview_path,
+                    output_path=output_path,
                     resolution=resolution,
                     aspect_ratio=aspect_ratio,
-                    burn_captions=False,
+                    burn_captions=True,
                 )
             )
+
+        # Refresh caption-free preview alongside final render.
+        preview_path = self.preview_path(clip, resolution)
+        if preview_path != output_path:
+            if self._has_timeline_edits(state):
+                self.timeline_render.render_with_timeline(
+                    source_video=source_video,
+                    clip_start=clip.start_sec,
+                    clip_end=clip.end_sec,
+                    crop_path=crop_path,
+                    aspect_ratio=aspect_ratio,
+                    resolution=resolution,
+                    timeline=state.timeline,
+                    assets_dir=self.assets_dir(clip),
+                    caption_ass=None,
+                    output_path=preview_path,
+                    burn_captions=False,
+                )
+            else:
+                self.render.render(
+                    RenderRequest(
+                        source_video=source_video,
+                        clip=candidate,
+                        crop_path=crop_path,
+                        motion_plan=motion_plan,
+                        output_path=preview_path,
+                        resolution=resolution,
+                        aspect_ratio=aspect_ratio,
+                        burn_captions=False,
+                    )
+                )
 
         from app.services.thumbnails import ensure_clip_thumbnail
 
