@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from app.api.deps import get_db_session, get_file_store
+from app.config import get_settings
 from app.db.repository import ClipRepository, JobRepository, VideoRepository
+from app.infra.paths import resolve_storage_path
 from app.infra.storage import FileStore
 from app.schemas.video import VideoDetail, VideoSummary, VideosListResponse
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,7 +47,7 @@ def get_video(video_id: str, session: Session = Depends(get_db_session)) -> Vide
     job_count = len(JobRepository(session).list_for_video(video_id))
     return VideoDetail(
         **summary.model_dump(),
-        source_path=video.source_path,
+        source_path=str(resolve_storage_path(video.source_path, get_settings())),
         language=video.language,
         job_count=job_count,
     )

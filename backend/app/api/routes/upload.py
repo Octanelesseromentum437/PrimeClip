@@ -53,7 +53,7 @@ def _register_uploaded_video(
     video = Video(
         id=video_id,
         filename=filename,
-        source_path=str(path),
+        source_path=str(path.resolve()),
         duration_sec=duration,
         source_width=source_width,
         source_height=source_height,
