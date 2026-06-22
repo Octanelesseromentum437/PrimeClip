@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { sendNotification } from "@tauri-apps/plugin-notification";
+import { isImportNotified, markImportNotified, notifyCompletion } from "../lib/notifications";
 import { Nav } from "../components/Nav";
 import {
   exchangeDriveCode,
@@ -150,7 +150,10 @@ export function UploadPage() {
           patchUploadSession({ importId: null, readyVideo: video });
           setUploading(false);
           setImportProgress(null);
-          void sendNotification({ title: "PrimeClip", body: t("notify.importComplete") });
+          if (!isImportNotified(pendingImportId)) {
+            markImportNotified(pendingImportId);
+            void notifyCompletion({ body: t("notify.importComplete") });
+          }
           if (importPollRef.current) clearInterval(importPollRef.current);
         } else if (status.status === "failed") {
           setError(status.error_message ?? "Import failed");
@@ -235,7 +238,10 @@ export function UploadPage() {
           };
           setReadyVideo(video);
           patchUploadSession({ importId: null, readyVideo: video });
-          void sendNotification({ title: "PrimeClip", body: t("notify.importComplete") });
+          if (!isImportNotified(import_id)) {
+            markImportNotified(import_id);
+            void notifyCompletion({ body: t("notify.importComplete") });
+          }
           break;
         }
         if (status.status === "failed") {
