@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { sendNotification } from "@tauri-apps/plugin-notification";
 import { ClipCard } from "../components/ClipCard";
 import { JobProgress } from "../components/JobProgress";
 import { Nav } from "../components/Nav";
-import { fetchClips } from "../lib/api";
+import { fetchClips, fetchVideo } from "../lib/api";
+import { useLocale } from "../lib/i18n";
 import { useJobPolling } from "../hooks/useJobPolling";
+import { patchUploadSession } from "../lib/uploadSession";
 import type { ClipRecord } from "../lib/types";
 
 export function ResultsPage() {
@@ -14,28 +15,40 @@ export function ResultsPage() {
   const jobId = searchParams.get("job");
   const { data: job } = useJobPolling(jobId, true);
   const [clips, setClips] = useState<ClipRecord[]>([]);
-  const [notified, setNotified] = useState(false);
+  const [clipsLoading, setClipsLoading] = useState(true);
+  const { t } = useLocale();
 
   useEffect(() => {
-    if (!videoId || !job) return;
-    if (job.status === "completed" || job.status === "running") {
-      fetchClips(videoId).then(setClips);
-    }
+    if (!videoId) return;
+    setClipsLoading(true);
+    fetchClips(videoId)
+      .then(setClips)
+      .finally(() => setClipsLoading(false));
   }, [videoId, job?.status, job?.progress_pct]);
 
   useEffect(() => {
-    if (job?.status === "completed" && !notified) {
-      setNotified(true);
-      void sendNotification({ title: "PrimeClip", body: "Clip generation complete!" });
-      if (videoId) fetchClips(videoId).then(setClips);
+    if (!videoId || !jobId) return;
+    if (job?.status === "completed" || job?.status === "failed") {
+      patchUploadSession({ activeGeneration: null });
     }
-  }, [job?.status, notified, videoId]);
+  }, [videoId, jobId, job?.status]);
+
+  useEffect(() => {
+    if (!videoId || jobId) return;
+    fetchVideo(videoId).then((detail) => {
+      if (detail.latest_job_id) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("job", detail.latest_job_id);
+        window.history.replaceState(null, "", `?${params.toString()}`);
+      }
+    });
+  }, [videoId, jobId]);
 
   return (
     <div className="page-shell">
       <Nav />
       <main className="max-w-5xl mx-auto p-6 space-y-6">
-        <h1 className="text-2xl font-bold">Results</h1>
+        <h1 className="text-2xl font-bold">{t("results.title")}</h1>
 
         {job && (
           <JobProgress
@@ -55,8 +68,11 @@ export function ResultsPage() {
           ))}
         </div>
 
-        {job?.status === "completed" && clips.length === 0 && (
-          <p className="text-muted">No clips generated.</p>
+        {!clipsLoading && job?.status === "completed" && clips.length === 0 && (
+          <div className="space-y-1">
+            <p className="text-muted">{t("results.noClips")}</p>
+            <p className="text-sm text-app-fg-subtle">{t("results.noClipsHint")}</p>
+          </div>
         )}
       </main>
     </div>
