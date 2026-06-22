@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { VideoPreview, type VideoAspect } from "./VideoPreview";
 import { clipDownloadUrl, fetchClipQualities } from "../lib/api";
 import type { ClipRecord } from "../lib/types";
 
@@ -11,20 +12,41 @@ interface Props {
 export function ClipCard({ clip, videoId }: Props) {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [qualities, setQualities] = useState<string[]>([]);
+  const [aspectRatio, setAspectRatio] = useState<VideoAspect>("9:16");
   const [resolution, setResolution] = useState<string>("1080x1920");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClipQualities(clip.id)
-      .then((list) => {
-        setQualities(list);
-        if (list.length) setResolution(list[0]);
+      .then(({ resolutions, aspect_ratio }) => {
+        setQualities(resolutions);
+        setAspectRatio(aspect_ratio === "16:9" ? "16:9" : "9:16");
+        if (resolutions.length) setResolution(resolutions[0]);
       })
-      .catch(() => setQualities(["1080x1920"]));
+      .catch(() => {
+        setQualities(["1080x1920"]);
+        setAspectRatio("9:16");
+      });
   }, [clip.id]);
 
   useEffect(() => {
-    clipDownloadUrl(clip.id, resolution).then(setDownloadUrl);
-  }, [clip.id, resolution]);
+    if (clip.status !== "ready") {
+      setDownloadUrl(null);
+      return;
+    }
+    setPreviewLoading(true);
+    setPreviewError(null);
+    clipDownloadUrl(clip.id, resolution)
+      .then(setDownloadUrl)
+      .catch((err) => {
+        setDownloadUrl(null);
+        setPreviewError(err instanceof Error ? err.message : "Preview unavailable");
+      })
+      .finally(() => setPreviewLoading(false));
+  }, [clip.id, clip.status, resolution]);
+
+  const showPreview = clip.status === "ready" || clip.status === "rendering";
 
   return (
     <div className="card p-4 flex flex-col gap-3">
@@ -36,18 +58,22 @@ export function ClipCard({ clip, videoId }: Props) {
       </div>
       <p className="text-sm text-app-fg-muted line-clamp-2">{clip.reason}</p>
       <p className="text-xs text-app-fg-subtle">
-        {clip.start_sec.toFixed(0)}s – {clip.end_sec.toFixed(0)}s · {clip.status}
+        {Math.round(clip.start_sec)}s – {Math.round(clip.end_sec)}s · {clip.status}
       </p>
-      {clip.status === "ready" && downloadUrl && (
-        <div className="flex gap-2 mt-auto">
-          <video
-            key={downloadUrl}
-            src={downloadUrl}
-            controls
-            className="w-full rounded-lg max-h-48 bg-black"
-          />
-        </div>
+
+      {showPreview && (
+        <VideoPreview
+          src={clip.status === "ready" ? downloadUrl : null}
+          aspect={aspectRatio}
+          loading={clip.status === "rendering" || previewLoading}
+          error={
+            clip.status === "rendering"
+              ? "Rendering clip…"
+              : previewError
+          }
+        />
       )}
+
       {clip.status === "ready" && videoId && (
         <Link
           to={`/edit/${videoId}/${clip.id}`}
@@ -56,6 +82,7 @@ export function ClipCard({ clip, videoId }: Props) {
           Edit captions
         </Link>
       )}
+
       {clip.status === "ready" && downloadUrl && qualities.length > 0 && (
         <div className="space-y-2">
           <label className="block label-xs">
