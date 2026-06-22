@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes.captions import router as captions_router
+from app.api.routes.drive import drive_upload_router, router as drive_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
 from app.api.routes.jobs import jobs_router
@@ -12,6 +12,7 @@ from app.api.routes.jobs import router as generate_router
 from app.api.routes.providers import health_router
 from app.api.routes.providers import router as providers_router
 from app.api.routes.upload import router as upload_router
+from app.api.routes.url_import import router as url_import_router
 from app.api.routes.videos import router as videos_router
 from app.config import get_settings
 from app.db.session import init_db
@@ -47,7 +48,10 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router, prefix="/api")
     app.include_router(upload_router, prefix="/api")
+    app.include_router(url_import_router, prefix="/api")
     app.include_router(videos_router, prefix="/api")
+    app.include_router(drive_router, prefix="/api")
+    app.include_router(drive_upload_router, prefix="/api")
     app.include_router(generate_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
     app.include_router(clips_router, prefix="/api")

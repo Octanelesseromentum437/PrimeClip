@@ -33,6 +33,8 @@ def _register_uploaded_video(
     video_id: str,
     path: Path,
     filename: str,
+    source_url: str | None = None,
+    source_provider: str | None = None,
 ) -> UploadResponse:
     try:
         duration = ffmpeg.probe_duration(path)
@@ -55,6 +57,8 @@ def _register_uploaded_video(
         duration_sec=duration,
         source_width=source_width,
         source_height=source_height,
+        source_url=source_url,
+        source_provider=source_provider,
     )
     VideoRepository(session).create(video)
     return UploadResponse(video_id=video_id, filename=filename, duration_sec=duration)
