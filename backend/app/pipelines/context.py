@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.schemas.clip import ClipCandidate
 from app.schemas.face import FaceFrame
-from app.schemas.common import CaptionStyleName
+from app.schemas.common import CaptionStyleName, AspectRatio
 from app.schemas.provider import ProviderConfig
 from app.schemas.scene import Scene
 from app.schemas.transcript import TranscriptSegment
@@ -19,6 +19,7 @@ class PipelineContext:
     num_clips: int = 10
     caption_style: CaptionStyleName = CaptionStyleName.REELS
     words_per_screen: int | None = None
+    aspect_ratio: AspectRatio = AspectRatio.VERTICAL
     audio_path: Path | None = None
     transcript: list[TranscriptSegment] = field(default_factory=list)
     scenes: list[Scene] = field(default_factory=list)

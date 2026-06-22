@@ -11,7 +11,7 @@ from app.infra.storage import FileStore
 from app.pipelines.context import PipelineContext
 from app.providers.registry import ProviderRegistry
 from app.schemas.clip import ClipSelectionRequest
-from app.schemas.common import CaptionStyleName, ClipStatus, JobStatus, Resolution
+from app.schemas.common import CaptionStyleName, ClipStatus, JobStatus, Resolution, AspectRatio
 from app.schemas.caption import STYLE_PRESETS
 from app.services.audio.extract import AudioExtractService
 from app.services.captions.generator import CaptionService
@@ -94,6 +94,12 @@ class ClipGenerationPipeline:
             job.started_at = datetime.now(UTC)
             job_repo.update(job)
 
+            self.file_store.write_json_artifact(
+                ctx.video_id,
+                "aspect_ratio.json",
+                {"aspect_ratio": ctx.aspect_ratio.value},
+            )
+
             # Stage 1: Extract audio
             update("extract_audio", 5)
             audio_path = self.file_store.artifact_dir(ctx.video_id) / "audio.wav"
@@ -162,12 +168,16 @@ class ClipGenerationPipeline:
                 [c.model_dump() for c in ctx.clip_candidates],
             )
 
-            # Stage 5: Probe dimensions (face tracking runs per clip during render)
+            # Stage 5: Probe dimensions (face tracking runs per clip during render for vertical)
             update("track_faces", 55)
             ctx.source_width, ctx.source_height = await asyncio.to_thread(
                 self.ffmpeg.probe_dimensions, ctx.video_path
             )
             self._check_cancelled(job, session)
+
+            target_aspect = (
+                (16, 9) if ctx.aspect_ratio == AspectRatio.HORIZONTAL else (9, 16)
+            )
 
             # Stage 6: Render clips
             db_clips: list[Clip] = []
@@ -193,25 +203,31 @@ class ClipGenerationPipeline:
             for db_clip, candidate in zip(db_clips, ctx.clip_candidates, strict=True):
                 self._check_cancelled(job, session)
                 try:
-                    clip_faces = await asyncio.to_thread(
-                        self.face_tracking.track,
-                        ctx.video_path,
-                        sample_fps=6.0,
-                        start_sec=candidate.start,
-                        end_sec=candidate.end,
-                    )
-                    self.file_store.write_json_artifact(
-                        ctx.video_id,
-                        f"clip_{db_clip.index:02d}/face_tracks.json",
-                        [f.model_dump() for f in clip_faces],
-                    )
-                    clip_crop = await asyncio.to_thread(
-                        self.vertical_crop.compute_crop_path,
-                        clip_faces,
-                        (ctx.source_width, ctx.source_height),
-                        smoothing_window=5,
-                    )
-                    clip_crop = self.vertical_crop.aggregate_median(clip_crop)
+                    if ctx.aspect_ratio == AspectRatio.HORIZONTAL:
+                        clip_crop = self.vertical_crop.center_crop_path(
+                            (ctx.source_width, ctx.source_height),
+                            target_aspect=target_aspect,
+                        )
+                    else:
+                        clip_faces = await asyncio.to_thread(
+                            self.face_tracking.track,
+                            ctx.video_path,
+                            sample_fps=6.0,
+                            start_sec=candidate.start,
+                            end_sec=candidate.end,
+                        )
+                        self.file_store.write_json_artifact(
+                            ctx.video_id,
+                            f"clip_{db_clip.index:02d}/face_tracks.json",
+                            [f.model_dump() for f in clip_faces],
+                        )
+                        clip_crop = await asyncio.to_thread(
+                            self.vertical_crop.compute_crop_path,
+                            clip_faces,
+                            (ctx.source_width, ctx.source_height),
+                            smoothing_window=5,
+                        )
+                        clip_crop = self.vertical_crop.aggregate_median(clip_crop)
                     artifact = self.file_store.artifact_dir(ctx.video_id)
                     cap_dir = artifact / f"clip_{db_clip.index:02d}"
                     caption_files = self.captions.generate(
@@ -226,21 +242,42 @@ class ClipGenerationPipeline:
                             if ctx.words_per_screen
                             else None
                         ),
+                        aspect_ratio=ctx.aspect_ratio,
                     )
                     motion_plan = self.motion.plan(candidate, ctx.transcript)
                     output_path = output_dir / f"clip_{db_clip.index:02d}.mp4"
-
+                    from app.schemas.common import resolution_label
+                    preview_path = output_dir / (
+                        f"clip_{db_clip.index:02d}_preview_"
+                        f"{resolution_label(ctx.aspect_ratio, Resolution.HD)}.mp4"
+                    )
                     from app.schemas.render import RenderRequest
+
+                    render_base = RenderRequest(
+                        source_video=ctx.video_path,
+                        clip=candidate,
+                        crop_path=clip_crop,
+                        motion_plan=motion_plan,
+                        aspect_ratio=ctx.aspect_ratio,
+                    )
 
                     await asyncio.to_thread(
                         self.render.render,
-                        RenderRequest(
-                            source_video=ctx.video_path,
-                            clip=candidate,
-                            crop_path=clip_crop,
-                            caption_ass=caption_files.ass,
-                            motion_plan=motion_plan,
-                            output_path=output_path,
+                        render_base.model_copy(
+                            update={
+                                "caption_ass": caption_files.ass,
+                                "output_path": output_path,
+                                "burn_captions": True,
+                            }
+                        ),
+                    )
+                    await asyncio.to_thread(
+                        self.render.render,
+                        render_base.model_copy(
+                            update={
+                                "output_path": preview_path,
+                                "burn_captions": False,
+                            }
                         ),
                     )
                     db_clip.output_path = str(output_path)
@@ -248,7 +285,7 @@ class ClipGenerationPipeline:
                     ClipVariantRepository(session).upsert(
                         ClipVariant(
                             clip_id=db_clip.id,
-                            resolution=Resolution.HD.value,
+                            resolution=resolution_label(ctx.aspect_ratio, Resolution.HD),
                             output_path=str(output_path),
                         )
                     )

@@ -2,7 +2,7 @@ from app.api.deps import get_db_session, get_job_runner
 from app.db.models import Job
 from app.db.repository import JobRepository, VideoRepository
 from app.jobs.runner import JobRunner
-from app.schemas.common import CaptionStyleName, JobStatus
+from app.schemas.common import CaptionStyleName, JobStatus, AspectRatio
 from app.schemas.provider import ProviderConfig
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -18,6 +18,7 @@ class GenerateClipsRequest(BaseModel):
     language: str | None = None
     caption_style: CaptionStyleName = CaptionStyleName.REELS
     words_per_screen: int | None = Field(default=None, ge=1, le=10)
+    aspect_ratio: AspectRatio = AspectRatio.VERTICAL
 
 
 class GenerateClipsResponse(BaseModel):
@@ -60,6 +61,7 @@ async def generate_clips(
         language=body.language,
         caption_style=body.caption_style,
         words_per_screen=body.words_per_screen,
+        aspect_ratio=body.aspect_ratio,
     )
 
     return GenerateClipsResponse(job_id=job.id)

@@ -58,8 +58,9 @@ class JobRunner:
         language: str | None = None,
         caption_style: "CaptionStyleName | None" = None,
         words_per_screen: int | None = None,
+        aspect_ratio: "AspectRatio | None" = None,
     ) -> None:
-        from app.schemas.common import CaptionStyleName
+        from app.schemas.common import CaptionStyleName, AspectRatio
 
         task = asyncio.create_task(
             self._run_job(
@@ -70,6 +71,7 @@ class JobRunner:
                 language,
                 caption_style or CaptionStyleName.REELS,
                 words_per_screen,
+                aspect_ratio or AspectRatio.VERTICAL,
             )
         )
         self._running[job_id] = task
@@ -102,6 +104,7 @@ class JobRunner:
         language: str | None,
         caption_style: "CaptionStyleName",
         words_per_screen: int | None,
+        aspect_ratio: "AspectRatio",
     ) -> None:
         from app.schemas.common import CaptionStyleName
 
@@ -124,6 +127,7 @@ class JobRunner:
                 num_clips=num_clips,
                 caption_style=caption_style,
                 words_per_screen=words_per_screen,
+                aspect_ratio=aspect_ratio,
             )
             try:
                 await self.pipeline.run(ctx, job, session)
