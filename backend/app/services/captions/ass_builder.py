@@ -25,14 +25,15 @@ def _format_ass_time(seconds: float) -> str:
 
 
 class AssBuilder:
-    def build_header(self, style: CaptionStyle) -> str:
+    def build_header(self, style: CaptionStyle, *, play_res: tuple[int, int] = (1080, 1920)) -> str:
+        play_res_x, play_res_y = play_res
         primary = _hex_to_ass_color(style.primary_color)
         outline = _hex_to_ass_color(style.outline_color)
         bold = -1 if style.bold else 0
         return f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+PlayResX: {play_res_x}
+PlayResY: {play_res_y}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -41,6 +42,23 @@ Style: Default,{style.font_family},{style.font_size},{primary},&H000000FF,{outli
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
+
+    def build_ass(
+        self,
+        style: CaptionStyle,
+        cues: list[CaptionCue],
+        *,
+        play_res: tuple[int, int] = (1080, 1920),
+    ) -> str:
+        events: list[str] = []
+        for cue in cues:
+            if cue.end <= cue.start or not cue.text.strip():
+                continue
+            text = cue.text.replace("\n", " ").strip()
+            events.append(
+                f"Dialogue: 0,{_format_ass_time(cue.start)},{_format_ass_time(cue.end)},Default,,0,0,0,,{text}"
+            )
+        return self.build_header(style, play_res=play_res) + "\n".join(events) + "\n"
 
     def build_srt(self, cues: list[CaptionCue]) -> str:
         lines: list[str] = []
@@ -52,14 +70,3 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             lines.append(cue.text.strip())
             lines.append("")
         return "\n".join(lines)
-
-    def build_ass(self, style: CaptionStyle, cues: list[CaptionCue]) -> str:
-        events: list[str] = []
-        for cue in cues:
-            if cue.end <= cue.start or not cue.text.strip():
-                continue
-            text = cue.text.replace("\n", " ").strip()
-            events.append(
-                f"Dialogue: 0,{_format_ass_time(cue.start)},{_format_ass_time(cue.end)},Default,,0,0,0,,{text}"
-            )
-        return self.build_header(style) + "\n".join(events) + "\n"

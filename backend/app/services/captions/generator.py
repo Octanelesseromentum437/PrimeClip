@@ -6,7 +6,7 @@ from app.schemas.caption import (
     CaptionStyle,
     STYLE_PRESETS,
 )
-from app.schemas.common import CaptionStyleName
+from app.schemas.common import CaptionStyleName, AspectRatio
 from app.schemas.transcript import TranscriptSegment
 from app.services.captions.ass_builder import AssBuilder
 from app.services.captions.chunker import CaptionChunker
@@ -27,10 +27,11 @@ class CaptionService:
         output_dir: Path,
         *,
         style_override: CaptionStyle | None = None,
+        aspect_ratio: AspectRatio = AspectRatio.VERTICAL,
     ) -> CaptionFiles:
         style = style_override or STYLE_PRESETS[style_name]
         cues = self.chunker.chunk_segments(segments, clip_range, style)
-        return self.write_files(output_dir, style_name, style, cues)
+        return self.write_files(output_dir, style_name, style, cues, aspect_ratio=aspect_ratio)
 
     def write_files(
         self,
@@ -38,12 +39,18 @@ class CaptionService:
         style_name: CaptionStyleName,
         style: CaptionStyle,
         cues: list,
+        *,
+        aspect_ratio: AspectRatio = AspectRatio.VERTICAL,
     ) -> CaptionFiles:
         output_dir.mkdir(parents=True, exist_ok=True)
         srt_path = output_dir / "captions.srt"
         ass_path = output_dir / "captions.ass"
+        play_res = (1920, 1080) if aspect_ratio == AspectRatio.HORIZONTAL else (1080, 1920)
         srt_path.write_text(self.ass_builder.build_srt(cues), encoding="utf-8")
-        ass_path.write_text(self.ass_builder.build_ass(style, cues), encoding="utf-8")
+        ass_path.write_text(
+            self.ass_builder.build_ass(style, cues, play_res=play_res),
+            encoding="utf-8",
+        )
         self.edit_store.save(
             output_dir / "caption_edit.json",
             CaptionEditState(cues=cues, style=style),
