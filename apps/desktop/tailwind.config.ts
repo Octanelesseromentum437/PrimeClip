@@ -22,6 +22,7 @@ export default {
           muted: "rgb(var(--app-muted) / <alpha-value>)",
           "muted-hover": "rgb(var(--app-muted-hover) / <alpha-value>)",
           border: "rgb(var(--app-border) / <alpha-value>)",
+          sidebar: "rgb(var(--app-sidebar) / <alpha-value>)",
           nav: "rgb(var(--app-nav) / <alpha-value>)",
           fg: "rgb(var(--app-fg) / <alpha-value>)",
           "fg-muted": "rgb(var(--app-fg-muted) / <alpha-value>)",

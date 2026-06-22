@@ -4,61 +4,143 @@
 
 @layer base {
   :root {
-    --app-bg: 248 250 252;
+    --app-bg: 244 244 245;
     --app-surface: 255 255 255;
-    --app-surface-muted: 241 245 249;
+    --app-surface-muted: 250 250 250;
     --app-input: 255 255 255;
-    --app-muted: 241 245 249;
-    --app-muted-hover: 226 232 240;
-    --app-border: 226 232 240;
-    --app-nav: 255 255 255;
-    --app-fg: 15 23 42;
-    --app-fg-muted: 100 116 139;
-    --app-fg-subtle: 148 163 184;
+    --app-muted: 244 244 245;
+    --app-muted-hover: 228 228 231;
+    --app-border: 228 228 231;
+    --app-sidebar: 250 250 250;
+    --app-fg: 9 9 11;
+    --app-fg-muted: 82 82 91;
+    --app-fg-subtle: 113 113 122;
   }
 
   .dark {
-    --app-bg: 2 6 23;
-    --app-surface: 15 23 42;
-    --app-surface-muted: 15 23 42;
-    --app-input: 2 6 23;
-    --app-muted: 30 41 59;
-    --app-muted-hover: 51 65 85;
-    --app-border: 30 41 59;
-    --app-nav: 15 23 42;
-    --app-fg: 241 245 249;
-    --app-fg-muted: 148 163 184;
-    --app-fg-subtle: 100 116 139;
+    --app-bg: 9 9 11;
+    --app-surface: 24 24 27;
+    --app-surface-muted: 18 18 20;
+    --app-input: 24 24 27;
+    --app-muted: 39 39 42;
+    --app-muted-hover: 63 63 70;
+    --app-border: 39 39 42;
+    --app-sidebar: 18 18 20;
+    --app-fg: 250 250 250;
+    --app-fg-muted: 161 161 170;
+    --app-fg-subtle: 113 113 122;
   }
 
   body {
     margin: 0;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     @apply bg-app-bg text-app-fg antialiased;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  [data-tauri-drag-region] {
+    -webkit-app-region: drag;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  video,
+  .sidebar-item {
+    -webkit-app-region: no-drag;
   }
 }
 
 @layer components {
+  .app-shell {
+    @apply h-screen flex overflow-hidden bg-app-bg text-app-fg;
+  }
+
+  .app-main {
+    @apply flex-1 flex flex-col min-w-0 min-h-0;
+  }
+
+  .titlebar-drag {
+    @apply h-7 shrink-0;
+  }
+
+  .app-content {
+    @apply flex-1 overflow-y-auto px-6 py-5;
+  }
+
+  .app-content-editor {
+    @apply flex-1 overflow-hidden min-h-0;
+  }
+
+  .sidebar {
+    @apply w-52 shrink-0 flex flex-col border-r border-app-border bg-app-sidebar;
+    padding-top: 28px;
+  }
+
+  .sidebar-brand {
+    @apply flex items-center gap-2.5 px-4 pb-4;
+  }
+
+  .sidebar-logo {
+    @apply flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-xs font-bold text-white;
+  }
+
+  .sidebar-title {
+    @apply text-sm font-semibold tracking-tight;
+  }
+
+  .sidebar-nav {
+    @apply flex-1 flex flex-col gap-0.5 px-2;
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-2 rounded-md px-3 py-2 text-sm text-app-fg-muted
+      hover:bg-app-muted hover:text-app-fg transition-colors;
+  }
+
+  .sidebar-item-active {
+    @apply bg-app-muted text-app-fg font-medium;
+  }
+
+  .sidebar-footer {
+    @apply p-2 border-t border-app-border;
+  }
+
+  .page-header {
+    @apply mb-5 flex items-start justify-between gap-4;
+  }
+
+  .page-title {
+    @apply text-lg font-semibold tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-app-fg-muted mt-0.5;
+  }
+
   .page-shell {
-    @apply min-h-screen bg-app-bg text-app-fg;
+    @apply min-h-full;
   }
 
   .card {
-    @apply rounded-xl border border-app-border bg-app-surface;
+    @apply rounded-lg border border-app-border/80 bg-app-surface;
   }
 
   .card-muted {
-    @apply rounded-xl border border-app-border bg-app-surface/80;
+    @apply rounded-lg border border-app-border/60 bg-app-surface-muted;
   }
 
   .input {
-    @apply w-full rounded-lg bg-app-input border border-app-border p-2 text-sm text-app-fg
-      focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500;
+    @apply w-full rounded-md bg-app-input border border-app-border px-2.5 py-1.5 text-sm text-app-fg
+      focus:outline-none focus:ring-1 focus:ring-brand-500/50 focus:border-brand-500/60;
   }
 
   .input-sm {
-    @apply w-full rounded bg-app-input border border-app-border p-1.5 text-sm text-app-fg
-      focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500;
+    @apply w-full rounded-md bg-app-input border border-app-border px-2 py-1 text-sm text-app-fg
+      focus:outline-none focus:ring-1 focus:ring-brand-500/50 focus:border-brand-500/60;
   }
 
   .label-muted {
@@ -70,21 +152,21 @@
   }
 
   .btn-ghost {
-    @apply px-3 py-1.5 text-sm rounded-lg bg-app-muted hover:bg-app-muted-hover transition-colors;
+    @apply px-3 py-1.5 text-sm rounded-md bg-app-muted hover:bg-app-muted-hover transition-colors;
   }
 
   .btn-secondary {
-    @apply py-2 rounded-lg bg-app-muted hover:bg-app-muted-hover font-medium disabled:opacity-50
-      transition-colors;
+    @apply py-2 px-3 rounded-md bg-app-muted hover:bg-app-muted-hover font-medium disabled:opacity-50
+      transition-colors text-sm;
   }
 
   .btn-primary {
-    @apply py-2 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-50 font-semibold
-      text-white transition-colors;
+    @apply py-2 px-3 rounded-md bg-brand-600 hover:bg-brand-500 disabled:opacity-50 font-medium
+      text-white transition-colors text-sm;
   }
 
   .btn-outline {
-    @apply py-2 rounded-lg border border-app-border hover:bg-app-muted text-sm transition-colors;
+    @apply py-2 px-3 rounded-md border border-app-border hover:bg-app-muted text-sm transition-colors;
   }
 
   .link-brand {
@@ -104,26 +186,280 @@
   }
 
   .alert-warning {
-    @apply rounded-lg border border-amber-300 dark:border-amber-800/60 bg-amber-50
-      dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200 space-y-2;
-  }
-
-  .nav-bar {
-    @apply border-b border-app-border bg-app-nav/90 backdrop-blur-sm px-4 lg:px-6 py-3 flex
-      items-center justify-between shrink-0;
+    @apply rounded-md border border-amber-300/70 dark:border-amber-800/50 bg-amber-50
+      dark:bg-amber-950/20 p-3 text-sm text-amber-800 dark:text-amber-200 space-y-2;
   }
 
   .panel-header {
-    @apply shrink-0 px-4 py-2.5 border-b border-app-border flex items-center justify-between;
+    @apply shrink-0 px-4 py-2 border-b border-app-border flex items-center justify-between bg-app-surface;
   }
 
   .chip {
-    @apply px-3 py-1.5 text-sm rounded-lg border border-app-border bg-app-surface
+    @apply px-3 py-1.5 text-sm rounded-md border border-app-border bg-app-surface
       hover:bg-app-muted transition-colors;
   }
 
   .chip-active {
-    @apply px-3 py-1.5 text-sm rounded-lg border border-brand-600 bg-brand-600/10
+    @apply px-3 py-1.5 text-sm rounded-md border border-brand-600/40 bg-brand-600/10
       text-brand-700 dark:text-brand-300 font-medium;
+  }
+
+  .segmented {
+    @apply inline-flex rounded-md border border-app-border bg-app-muted p-0.5 gap-0.5;
+  }
+
+  .segmented-item {
+    @apply px-3 py-1.5 text-xs rounded-[5px] text-app-fg-muted transition-colors;
+  }
+
+  .segmented-item-active {
+    @apply bg-app-surface text-app-fg font-medium shadow-sm;
+  }
+
+  .clip-card {
+    @apply card overflow-hidden flex flex-col;
+  }
+
+  .clip-thumb {
+    @apply relative bg-black overflow-hidden cursor-pointer;
+  }
+
+  .clip-thumb-overlay {
+    @apply absolute inset-0 flex items-center justify-center bg-black/30 opacity-0
+      group-hover:opacity-100 transition-opacity;
+  }
+
+  /* ── Editor (theme-aware) ── */
+  .editor-root {
+    @apply bg-app-bg;
+  }
+
+  .editor-shell {
+    @apply h-screen flex flex-col overflow-hidden bg-app-bg text-app-fg;
+    padding-top: 28px;
+  }
+
+  .editor-toolbar {
+    @apply shrink-0 flex items-center justify-between gap-4 px-4 py-2
+      border-b border-app-border bg-app-surface;
+  }
+
+  .editor-toolbar-btn {
+    @apply px-3 py-1.5 rounded-md text-xs font-medium text-app-fg
+      bg-app-muted hover:bg-app-muted-hover transition-colors disabled:opacity-50;
+  }
+
+  .editor-toolbar-btn-primary {
+    @apply bg-brand-600 text-white hover:bg-brand-500;
+  }
+
+  .editor-workspace {
+    @apply flex-1 flex min-h-0;
+  }
+
+  .editor-stage {
+    @apply flex-1 flex items-center justify-center min-w-0 min-h-0 p-4 bg-app-surface-muted;
+  }
+
+  .editor-inspector {
+    @apply w-56 shrink-0 border-l border-app-border bg-app-surface
+      overflow-y-auto p-3 space-y-4;
+  }
+
+  .editor-inspector-section {
+    @apply space-y-1;
+  }
+
+  .editor-inspector-label {
+    @apply block text-[10px] font-semibold uppercase tracking-wider text-app-fg-subtle;
+  }
+
+  .editor-preset {
+    @apply px-2 py-1.5 rounded-md text-xs text-app-fg-muted bg-app-muted
+      hover:bg-app-muted-hover transition-colors;
+  }
+
+  .editor-preset-active {
+    @apply bg-brand-600/10 text-brand-700 dark:text-brand-300 ring-1 ring-brand-500/40;
+  }
+
+  .editor-input {
+    @apply w-full rounded-md bg-app-input border border-app-border
+      px-2 py-1.5 text-xs text-app-fg focus:outline-none focus:ring-1 focus:ring-brand-500/50;
+  }
+
+  .editor-range {
+    @apply w-full accent-brand-500;
+  }
+
+  .editor-color {
+    @apply block h-8 w-full cursor-pointer rounded-md border border-app-border bg-app-input;
+  }
+
+  .editor-cue-bar {
+    @apply shrink-0 flex items-center gap-3 px-4 py-2 border-t border-app-border bg-app-surface;
+  }
+
+  .editor-cue-input {
+    @apply rounded-md bg-app-input border border-app-border px-3 py-1.5
+      text-sm text-app-fg placeholder:text-app-fg-subtle
+      focus:outline-none focus:ring-1 focus:ring-brand-500/50;
+  }
+
+  .editor-time-input {
+    @apply w-14 rounded bg-app-input border border-app-border px-1.5 py-0.5
+      text-[11px] text-app-fg-muted font-mono text-center
+      focus:outline-none focus:ring-1 focus:ring-brand-500/50;
+  }
+
+  .editor-player {
+    @apply flex flex-col items-center w-full h-full max-w-full max-h-full gap-3;
+  }
+
+  .editor-player-canvas {
+    @apply flex-1 flex items-center justify-center w-full min-h-0;
+  }
+
+  .editor-player-frame {
+    @apply relative overflow-hidden rounded-lg shadow-lg ring-1 ring-app-border bg-black;
+    max-height: 100%;
+    max-width: 100%;
+    height: 100%;
+    width: auto;
+  }
+
+  .editor-player-video {
+    @apply h-full w-full object-contain bg-black cursor-pointer;
+  }
+
+  .editor-player-caption {
+    @apply pointer-events-none absolute bottom-[12%] left-0 right-0 z-10
+      text-center px-6 leading-tight;
+  }
+
+  .editor-player-empty,
+  .editor-player-loading {
+    @apply flex items-center justify-center h-48 w-72 rounded-lg bg-app-muted
+      text-sm text-app-fg-muted;
+  }
+
+  .editor-player-controls {
+    @apply shrink-0 flex items-center gap-3 w-full max-w-2xl px-2;
+  }
+
+  .editor-control-btn {
+    @apply flex h-8 w-8 items-center justify-center rounded-full
+      bg-app-muted text-app-fg hover:bg-app-muted-hover transition-colors
+      disabled:opacity-40;
+  }
+
+  .editor-time {
+    @apply text-[11px] text-app-fg-muted min-w-[2.5rem];
+  }
+
+  .editor-scrubber {
+    @apply h-1 appearance-none rounded-full bg-app-border cursor-pointer;
+  }
+
+  .editor-scrubber::-webkit-slider-thumb {
+    @apply appearance-none h-3 w-3 rounded-full bg-app-fg shadow-md cursor-pointer;
+  }
+
+  .editor-scrubber::-moz-range-thumb {
+    @apply h-3 w-3 rounded-full bg-app-fg border-0 cursor-pointer;
+  }
+
+  .caption-timeline {
+    @apply shrink-0 flex flex-col border-t border-app-border bg-app-surface;
+    height: 168px;
+  }
+
+  .caption-timeline-toolbar {
+    @apply shrink-0 flex items-center justify-between px-4 py-1.5 border-b border-app-border;
+  }
+
+  .caption-timeline-scroll {
+    @apply flex-1 overflow-x-auto overflow-y-hidden;
+  }
+
+  .caption-timeline-inner {
+    @apply relative min-h-full pb-2;
+  }
+
+  .caption-ruler {
+    @apply relative h-6 border-b border-app-border;
+  }
+
+  .caption-ruler-tick {
+    @apply absolute top-0 h-full border-l border-app-border;
+  }
+
+  .caption-ruler-tick span {
+    @apply absolute top-0.5 left-1 text-[9px] text-app-fg-subtle tabular-nums whitespace-nowrap;
+  }
+
+  .caption-track-row {
+    @apply flex items-stretch pt-2;
+  }
+
+  .caption-track-label {
+    @apply shrink-0 flex items-center px-3 text-[10px] font-medium uppercase
+      tracking-wider text-app-fg-subtle border-r border-app-border;
+    width: 88px;
+  }
+
+  .caption-track {
+    @apply relative h-14 rounded-md mx-1 bg-app-muted;
+  }
+
+  .caption-block {
+    @apply absolute top-1 bottom-1 rounded-[4px] overflow-hidden cursor-pointer
+      bg-gradient-to-b from-brand-500/85 to-brand-700/85 border border-brand-400/40
+      hover:from-brand-400/90 hover:to-brand-600/90 transition-colors text-left;
+  }
+
+  .caption-block-selected {
+    @apply ring-2 ring-app-fg from-brand-500 to-brand-700 border-brand-400 z-10;
+  }
+
+  .caption-block-active {
+    @apply brightness-110;
+  }
+
+  .caption-block-label {
+    @apply block px-2 pt-1.5 text-[10px] text-white truncate pointer-events-none select-none;
+  }
+
+  .caption-block-handle {
+    @apply absolute top-0 bottom-0 w-1.5 cursor-col-resize opacity-0 hover:opacity-100
+      bg-white/50 transition-opacity;
+  }
+
+  .caption-block-handle-start {
+    @apply left-0 rounded-l;
+  }
+
+  .caption-block-handle-end {
+    @apply right-0 rounded-r;
+  }
+
+  .caption-block-selected .caption-block-handle {
+    @apply opacity-100;
+  }
+
+  .caption-playhead {
+    @apply absolute top-0 bottom-0 left-0 w-px pointer-events-none z-20;
+    will-change: transform;
+  }
+
+  .caption-playhead-head {
+    @apply absolute -top-0.5 -left-[5px] w-0 h-0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid rgb(244 63 94);
+  }
+
+  .caption-playhead-line {
+    @apply absolute top-0 bottom-0 left-0 w-px bg-rose-500;
   }
 }
