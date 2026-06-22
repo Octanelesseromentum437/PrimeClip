@@ -36,8 +36,17 @@ impl SidecarManager {
 
         tauri::async_runtime::spawn(async move {
             while let Some(event) = rx.recv().await {
-                if let tauri_plugin_shell::process::CommandEvent::Error(e) = event {
-                    eprintln!("sidecar error: {e}");
+                match event {
+                    tauri_plugin_shell::process::CommandEvent::Error(e) => {
+                        eprintln!("sidecar error: {e}");
+                    }
+                    tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
+                        eprintln!("sidecar: {}", String::from_utf8_lossy(&line));
+                    }
+                    tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                        eprintln!("sidecar: {}", String::from_utf8_lossy(&line));
+                    }
+                    _ => {}
                 }
             }
         });
@@ -60,9 +69,10 @@ impl Drop for SidecarManager {
 }
 
 pub fn wait_for_api(base_url: &str) -> bool {
-    // PyInstaller onefile sidecar can take 30–60s on first launch (extract + heavy imports).
-    for _ in 0..120 {
+    // PyInstaller onefile sidecar can take 30–90s on first launch (extract + heavy imports).
+    for attempt in 0..180 {
         if health_check(base_url).is_ok() {
+            eprintln!("sidecar ready after {}s", attempt);
             return true;
         }
         std::thread::sleep(std::time::Duration::from_millis(1000));
