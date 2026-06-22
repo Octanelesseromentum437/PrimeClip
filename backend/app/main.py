@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.captions import router as captions_router
 from app.api.routes.drive import drive_upload_router, router as drive_router
 from app.api.routes.clips import download_router
 from app.api.routes.clips import router as clips_router
