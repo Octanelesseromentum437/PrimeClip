@@ -15,6 +15,7 @@ dev:
 
 test:
 	PYTHONPATH=backend uv run pytest backend/tests -v
+	cd apps/desktop && npm run test:coverage
 
 lint:
 	PYTHONPATH=backend uv run ruff check backend/app backend/tests
