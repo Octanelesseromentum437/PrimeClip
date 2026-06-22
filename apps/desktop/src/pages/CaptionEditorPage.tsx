@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { CaptionTimeline } from "../components/editor/CaptionTimeline";
+import { ClipTimeline } from "../components/editor/ClipTimeline";
+import { EditorInspector } from "../components/editor/EditorInspector";
 import {
   EditorPlayer,
   type EditorPlayerHandle,
   type VideoAspect,
 } from "../components/editor/EditorPlayer";
 import {
+  clipMediaUrl,
   clipPreviewUrl,
   clipThumbnailUrl,
   fetchCaptions,
@@ -14,16 +16,43 @@ import {
   fetchSystemFonts,
   patchCaptions,
   rerenderClip,
+  uploadEditorMediaLocal,
 } from "../lib/api";
-import { formatCueTime, parseCueTime } from "../lib/formatTime";
-import type { CaptionCue, CaptionStyle, CaptionStyleName } from "../lib/types";
-
-const PRESETS: { id: CaptionStyleName; label: string }[] = [
-  { id: "reels", label: "Reels" },
-  { id: "classic", label: "Classic" },
-  { id: "minimal", label: "Minimal" },
-  { id: "podcast", label: "Podcast" },
-];
+import { formatCueTime } from "../lib/formatTime";
+import {
+  createTimelineId,
+  defaultTimeline,
+  effectiveDuration,
+  mediaBlockDuration,
+  collectCutPoints,
+  markAudioTrimIn,
+  markAudioTrimOut,
+  markTrimIn,
+  markTrimOut,
+  nextCut,
+  prevCut,
+  normalizeTimeline,
+  splitAudio,
+  splitCue,
+  splitOverlay,
+} from "../lib/timeline";
+import {
+  isTauriApp,
+  pickAudioFile,
+  pickBrollFile,
+  pickImageFile,
+} from "../lib/tauri";
+import type {
+  AudioItem,
+  CaptionCue,
+  CaptionStyle,
+  CaptionStyleName,
+  EditorSelection,
+  OverlayItem,
+  TimelineState,
+  VideoTrim,
+  VideoAudioTrim,
+} from "../lib/types";
 
 const FALLBACK_FONTS = ["Impact", "Arial", "Helvetica", "Georgia", "Verdana"];
 
@@ -34,22 +63,42 @@ export function CaptionEditorPage() {
 
   const [cues, setCues] = useState<CaptionCue[]>([]);
   const [style, setStyle] = useState<CaptionStyle | null>(null);
+  const [timeline, setTimeline] = useState<TimelineState>(defaultTimeline());
   const [activePreset, setActivePreset] = useState<CaptionStyleName | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [aspect, setAspect] = useState<VideoAspect>("9:16");
   const [fonts, setFonts] = useState<string[]>(FALLBACK_FONTS);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [duration, setDuration] = useState(0);
+  const [rawDuration, setRawDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [selection, setSelection] = useState<EditorSelection | null>(null);
   const currentTimeRef = useRef(0);
 
   const getCurrentTime = useCallback(() => currentTimeRef.current, []);
+
+  const effectiveDur = effectiveDuration(rawDuration, timeline.trim);
+
+  const resolveMediaUrls = useCallback(
+    async (tl: TimelineState) => {
+      if (!clipId) return;
+      const assets = [
+        ...tl.overlays.map((o) => o.asset),
+        ...tl.audio.map((a) => a.asset),
+      ];
+      const unique = [...new Set(assets)];
+      const entries = await Promise.all(
+        unique.map(async (asset) => [asset, await clipMediaUrl(clipId, asset)] as const),
+      );
+      setMediaUrls(Object.fromEntries(entries));
+    },
+    [clipId],
+  );
 
   const load = useCallback(async () => {
     if (!clipId) return;
@@ -66,10 +115,11 @@ export function CaptionEditorPage() {
       ]);
       setCues(data.cues);
       setStyle(data.style);
+      setTimeline(normalizeTimeline(data.timeline ?? defaultTimeline()));
       setActivePreset(data.preset);
       setAspect(qualities.aspect_ratio === "16:9" ? "16:9" : "9:16");
       setFonts(systemFonts.length ? systemFonts : FALLBACK_FONTS);
-      setSelectedIndex(data.cues.length ? 0 : null);
+      setSelection(data.cues.length ? { type: "caption", index: 0 } : { type: "video" });
 
       const resolution = qualities.resolutions[0];
       const [preview, thumb] = await Promise.all([
@@ -79,24 +129,25 @@ export function CaptionEditorPage() {
       setVideoUrl(`${preview}?t=${Date.now()}`);
       setThumbnailUrl(thumb ? `${thumb}?t=${Date.now()}` : null);
 
+      const tl = normalizeTimeline(data.timeline ?? defaultTimeline());
+      await resolveMediaUrls(tl);
+
       const fallbackDuration =
         data.cues.length > 0 ? Math.max(...data.cues.map((c) => c.end)) : 60;
-      setDuration(fallbackDuration);
+      setRawDuration(fallbackDuration);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load captions");
+      setError(err instanceof Error ? err.message : "Failed to load editor");
     } finally {
       setLoading(false);
     }
-  }, [clipId]);
+  }, [clipId, resolveMediaUrls]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const updateCue = (index: number, patch: Partial<CaptionCue>) => {
-    setCues((prev) =>
-      prev.map((cue, i) => (i === index ? { ...cue, ...patch } : cue)),
-    );
+    setCues((prev) => prev.map((cue, i) => (i === index ? { ...cue, ...patch } : cue)));
   };
 
   const handleSeek = (time: number) => {
@@ -104,14 +155,32 @@ export function CaptionEditorPage() {
     currentTimeRef.current = time;
   };
 
+  const handlePlay = () => {
+    playerRef.current?.play();
+  };
+
+  const handlePause = () => {
+    playerRef.current?.pause();
+  };
+
+  const handleStop = () => {
+    playerRef.current?.stop();
+    currentTimeRef.current = timeline.trim.start;
+  };
+
+  const handleTogglePlay = () => {
+    playerRef.current?.togglePlay();
+  };
+
   const handleSave = async () => {
     if (!clipId || !style) return;
     setSaving(true);
     setError(null);
     try {
-      const data = await patchCaptions(clipId, { cues, style });
+      const data = await patchCaptions(clipId, { cues, style, timeline });
       setCues(data.cues);
       setStyle(data.style);
+      setTimeline(data.timeline ?? timeline);
       setActivePreset(data.preset);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -156,7 +225,7 @@ export function CaptionEditorPage() {
     setRendering(true);
     setError(null);
     try {
-      await patchCaptions(clipId, { cues, style: style ?? undefined });
+      await patchCaptions(clipId, { cues, style: style ?? undefined, timeline });
       await rerenderClip(clipId);
       navigate(`/results/${videoId}`);
     } catch (err) {
@@ -166,18 +235,322 @@ export function CaptionEditorPage() {
     }
   };
 
+  const handleTrimChange = (trim: VideoTrim) => {
+    setTimeline((prev) => ({ ...prev, trim }));
+  };
+
+  const handleVideoAudioChange = (audioTrim: VideoAudioTrim) => {
+    setTimeline((prev) => ({ ...prev, audio_trim: audioTrim }));
+  };
+
+  const handleMarkIn = useCallback(() => {
+    const t = currentTimeRef.current;
+    setTimeline((prev) => ({
+      ...prev,
+      trim: markTrimIn(prev.trim, t, rawDuration),
+    }));
+    setSelection({ type: "video" });
+  }, [rawDuration]);
+
+  const handleMarkOut = useCallback(() => {
+    const t = currentTimeRef.current;
+    setTimeline((prev) => ({
+      ...prev,
+      trim: markTrimOut(prev.trim, t, rawDuration),
+    }));
+    setSelection({ type: "video" });
+  }, [rawDuration]);
+
+  const handleMarkAudioIn = useCallback(() => {
+    const t = currentTimeRef.current;
+    setTimeline((prev) => ({
+      ...prev,
+      audio_trim: markAudioTrimIn(prev.audio_trim, t, rawDuration),
+    }));
+    setSelection({ type: "video-audio" });
+  }, [rawDuration]);
+
+  const handleMarkAudioOut = useCallback(() => {
+    const t = currentTimeRef.current;
+    setTimeline((prev) => ({
+      ...prev,
+      audio_trim: markAudioTrimOut(prev.audio_trim, t, rawDuration),
+    }));
+    setSelection({ type: "video-audio" });
+  }, [rawDuration]);
+
+  const handleSplitAtPlayhead = useCallback(() => {
+    const t = currentTimeRef.current;
+    if (!selection) return;
+
+    if (selection.type === "caption") {
+      const cue = cues[selection.index];
+      if (!cue) return;
+      const parts = splitCue(cue, t);
+      if (!parts) return;
+      setCues((prev) => {
+        const next = [...prev];
+        next.splice(selection.index, 1, parts[0], parts[1]);
+        return next;
+      });
+      setSelection({ type: "caption", index: selection.index + 1 });
+      return;
+    }
+
+    if (selection.type === "overlay") {
+      const item = timeline.overlays.find((o) => o.id === selection.id);
+      if (!item) return;
+      const parts = splitOverlay(item, t);
+      if (!parts) return;
+      setTimeline((prev) => {
+        const idx = prev.overlays.findIndex((o) => o.id === selection.id);
+        if (idx < 0) return prev;
+        const overlays = [...prev.overlays];
+        overlays.splice(idx, 1, parts[0], parts[1]);
+        return { ...prev, overlays };
+      });
+      setSelection({ type: "overlay", id: parts[1].id });
+      return;
+    }
+
+    if (selection.type === "audio") {
+      const item = timeline.audio.find((a) => a.id === selection.id);
+      if (!item) return;
+      const parts = splitAudio(item, t);
+      if (!parts) return;
+      setTimeline((prev) => {
+        const idx = prev.audio.findIndex((a) => a.id === selection.id);
+        if (idx < 0) return prev;
+        const audio = [...prev.audio];
+        audio.splice(idx, 1, parts[0], parts[1]);
+        return { ...prev, audio };
+      });
+      setSelection({ type: "audio", id: parts[1].id });
+    }
+  }, [selection, cues, timeline]);
+
+  const handleTimelineChange = (next: TimelineState) => {
+    setTimeline(next);
+  };
+
+  const handleUpdateOverlay = (id: string, patch: Partial<OverlayItem>) => {
+    setTimeline((prev) => ({
+      ...prev,
+      overlays: prev.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+    }));
+  };
+
+  const handleUpdateAudio = (id: string, patch: Partial<AudioItem>) => {
+    setTimeline((prev) => ({
+      ...prev,
+      audio: prev.audio.map((a) => (a.id === id ? { ...a, ...patch } : a)),
+    }));
+  };
+
+  const handleDeleteOverlay = (id: string) => {
+    setTimeline((prev) => ({
+      ...prev,
+      overlays: prev.overlays.filter((o) => o.id !== id),
+    }));
+    if (selection?.type === "overlay" && selection.id === id) {
+      setSelection({ type: "video" });
+    }
+  };
+
+  const handleDeleteAudio = (id: string) => {
+    setTimeline((prev) => ({
+      ...prev,
+      audio: prev.audio.filter((a) => a.id !== id),
+    }));
+    if (selection?.type === "audio" && selection.id === id) {
+      setSelection({ type: "video" });
+    }
+  };
+
+  const handleDeleteSelection = useCallback(() => {
+    if (!selection) return;
+    if (selection.type === "overlay") {
+      handleDeleteOverlay(selection.id);
+    } else if (selection.type === "audio") {
+      handleDeleteAudio(selection.id);
+    } else if (selection.type === "caption") {
+      setCues((prev) => prev.filter((_, i) => i !== selection.index));
+      setSelection(
+        cues.length > 1
+          ? { type: "caption", index: Math.min(selection.index, cues.length - 2) }
+          : { type: "video" },
+      );
+    }
+  }, [selection, cues.length]);
+
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
+
+      const editPoints = collectCutPoints(rawDuration, timeline, cues);
+      const t = currentTimeRef.current;
+      const mod = e.metaKey || e.ctrlKey;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        handleTogglePlay();
+        return;
+      }
+      if (
+        (mod && (e.key === "k" || e.key === "K" || e.key === "b" || e.key === "B")) ||
+        (!mod && (e.key === "b" || e.key === "B"))
+      ) {
+        e.preventDefault();
+        handleSplitAtPlayhead();
+        return;
+      }
+      if (e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        handlePause();
+        return;
+      }
+      if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        handleStop();
+        return;
+      }
+      if (e.key === "i" || e.key === "I" || e.key === "[") {
+        e.preventDefault();
+        if (e.shiftKey) handleMarkAudioIn();
+        else handleMarkIn();
+        return;
+      }
+      if (e.key === "o" || e.key === "O" || e.key === "]") {
+        e.preventDefault();
+        if (e.shiftKey) handleMarkAudioOut();
+        else handleMarkOut();
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        handleDeleteSelection();
+        return;
+      }
+      if (e.key === "ArrowLeft" || e.key === ",") {
+        e.preventDefault();
+        handleSeek(prevCut(editPoints, t));
+        return;
+      }
+      if (e.key === "ArrowRight" || e.key === ".") {
+        e.preventDefault();
+        handleSeek(nextCut(editPoints, t));
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    rawDuration,
+    timeline,
+    cues,
+    handleMarkIn,
+    handleMarkOut,
+    handleMarkAudioIn,
+    handleMarkAudioOut,
+    handleSplitAtPlayhead,
+    handleDeleteSelection,
+  ]);
+
+  const uploadAsset = async (path: string) => {
+    if (!clipId) throw new Error("No clip");
+    return uploadEditorMediaLocal(clipId, path);
+  };
+
+  const addOverlay = async (kind: "image" | "broll") => {
+    if (!isTauriApp()) {
+      setError("Importe mídia pelo app desktop (Tauri).");
+      return;
+    }
+    const path =
+      kind === "image" ? await pickImageFile() : await pickBrollFile();
+    if (!path || !clipId) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const uploaded = await uploadAsset(path);
+      const url = await clipMediaUrl(clipId, uploaded.asset);
+      setMediaUrls((prev) => ({ ...prev, [uploaded.asset]: url }));
+
+      const t = currentTimeRef.current;
+      const blockDur = mediaBlockDuration(t, effectiveDur);
+      const id = createTimelineId();
+      const item: OverlayItem = {
+        id,
+        kind,
+        start: t,
+        end: t + blockDur,
+        asset: uploaded.asset,
+        label: uploaded.label,
+        x: kind === "image" ? 10 : 0,
+        y: kind === "image" ? 10 : 0,
+        width: kind === "image" ? 40 : 100,
+        height: kind === "image" ? 30 : 100,
+        opacity: 1,
+        volume: kind === "broll" ? 0.8 : 1,
+      };
+      setTimeline((prev) => ({ ...prev, overlays: [...prev.overlays, item] }));
+      setSelection({ type: "overlay", id });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addMusic = async () => {
+    if (!isTauriApp()) {
+      setError("Importe mídia pelo app desktop (Tauri).");
+      return;
+    }
+    const path = await pickAudioFile();
+    if (!path || !clipId) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const uploaded = await uploadAsset(path);
+      const url = await clipMediaUrl(clipId, uploaded.asset);
+      setMediaUrls((prev) => ({ ...prev, [uploaded.asset]: url }));
+
+      const t = currentTimeRef.current;
+      const blockDur = mediaBlockDuration(t, effectiveDur, 8);
+      const id = createTimelineId();
+      const item: AudioItem = {
+        id,
+        start: t,
+        end: Math.min(effectiveDur, t + blockDur),
+        asset: uploaded.asset,
+        label: uploaded.label,
+        volume: 0.35,
+        source_offset: 0,
+        fade_in: 0.5,
+        fade_out: 0.5,
+      };
+      setTimeline((prev) => ({ ...prev, audio: [...prev.audio, item] }));
+      setSelection({ type: "audio", id });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const fontOptions =
     style && !fonts.includes(style.font_family)
       ? [style.font_family, ...fonts]
       : fonts;
-
-  const selectedCue = selectedIndex !== null ? cues[selectedIndex] : null;
-  const effectiveDuration =
-    duration > 0
-      ? duration
-      : cues.length
-        ? Math.max(...cues.map((c) => c.end))
-        : 60;
 
   if (loading) {
     return (
@@ -198,9 +571,9 @@ export function CaptionEditorPage() {
             ← Back
           </Link>
           <div className="min-w-0">
-            <h1 className="text-sm font-semibold truncate">Caption Editor</h1>
+            <h1 className="text-sm font-semibold truncate">Editor de Clip</h1>
             <p className="text-[11px] text-app-fg-subtle truncate">
-              {cues.length} captions · {formatCueTime(effectiveDuration)}
+              {cues.length} legendas · {formatCueTime(effectiveDur)}
             </p>
           </div>
         </div>
@@ -237,152 +610,70 @@ export function CaptionEditorPage() {
             aspect={aspect}
             cues={cues}
             style={style}
+            timeline={timeline}
+            mediaUrls={mediaUrls}
+            selectedOverlayId={
+              selection?.type === "overlay" ? selection.id : null
+            }
             onTimeUpdate={(t) => {
               currentTimeRef.current = t;
             }}
-            onDurationChange={(d) => setDuration(d)}
+            onDurationChange={(d) => {
+              setRawDuration(d);
+            }}
             onPlayStateChange={setPlaying}
+            onSelectOverlay={(id) => setSelection({ type: "overlay", id })}
+            onUpdateOverlay={handleUpdateOverlay}
           />
         </div>
 
         <aside className="editor-inspector">
-          <div className="editor-inspector-section">
-            <p className="editor-inspector-label">Presets</p>
-            <div className="grid grid-cols-2 gap-1.5">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handlePreset(p.id)}
-                  disabled={saving}
-                  className={
-                    activePreset === p.id
-                      ? "editor-preset editor-preset-active"
-                      : "editor-preset"
-                  }
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {style && (
-            <>
-              <div className="editor-inspector-section">
-                <label className="editor-inspector-label">
-                  Font
-                  <select
-                    value={style.font_family}
-                    onChange={(e) =>
-                      setStyle({ ...style, font_family: e.target.value })
-                    }
-                    className="editor-input mt-1"
-                  >
-                    {fontOptions.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="editor-inspector-section">
-                <label className="editor-inspector-label">
-                  Size · {style.font_size}
-                  <input
-                    type="range"
-                    min={40}
-                    max={120}
-                    value={style.font_size}
-                    onChange={(e) =>
-                      setStyle({ ...style, font_size: Number(e.target.value) })
-                    }
-                    className="editor-range mt-2"
-                  />
-                </label>
-              </div>
-
-              <div className="editor-inspector-section">
-                <label className="editor-inspector-label">
-                  Words / screen · {style.words_per_screen}
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    value={style.words_per_screen}
-                    onChange={(e) => handleWordsPerScreen(Number(e.target.value))}
-                    className="editor-range mt-2"
-                  />
-                </label>
-              </div>
-
-              <div className="editor-inspector-section">
-                <label className="editor-inspector-label">
-                  Color
-                  <input
-                    type="color"
-                    value={style.primary_color}
-                    onChange={(e) =>
-                      setStyle({ ...style, primary_color: e.target.value })
-                    }
-                    className="editor-color mt-1"
-                  />
-                </label>
-              </div>
-            </>
-          )}
+          <EditorInspector
+            selection={selection}
+            timeline={timeline}
+            duration={rawDuration}
+            cues={cues}
+            style={style}
+            activePreset={activePreset}
+            fontOptions={fontOptions}
+            saving={saving}
+            mediaUrls={mediaUrls}
+            onPreset={handlePreset}
+            onStyleChange={setStyle}
+            onWordsPerScreen={handleWordsPerScreen}
+            onTrimChange={handleTrimChange}
+            onVideoAudioChange={handleVideoAudioChange}
+            onUpdateCue={updateCue}
+            onUpdateOverlay={handleUpdateOverlay}
+            onUpdateAudio={handleUpdateAudio}
+            onDeleteOverlay={handleDeleteOverlay}
+            onDeleteAudio={handleDeleteAudio}
+          />
         </aside>
       </div>
 
-      {selectedCue && selectedIndex !== null && (
-        <div className="editor-cue-bar">
-          <div className="flex items-center gap-3 shrink-0 text-[11px] text-app-fg-subtle tabular-nums">
-            <span>#{selectedIndex + 1}</span>
-            <input
-              type="text"
-              defaultValue={formatCueTime(selectedCue.start)}
-              key={`s-${selectedIndex}-${selectedCue.start}`}
-              onBlur={(e) => {
-                const parsed = parseCueTime(e.target.value);
-                if (parsed !== null) updateCue(selectedIndex, { start: parsed });
-              }}
-              className="editor-time-input"
-              aria-label="Start time"
-            />
-            <span>→</span>
-            <input
-              type="text"
-              defaultValue={formatCueTime(selectedCue.end)}
-              key={`e-${selectedIndex}-${selectedCue.end}`}
-              onBlur={(e) => {
-                const parsed = parseCueTime(e.target.value);
-                if (parsed !== null) updateCue(selectedIndex, { end: parsed });
-              }}
-              className="editor-time-input"
-              aria-label="End time"
-            />
-          </div>
-          <input
-            type="text"
-            value={selectedCue.text}
-            onChange={(e) => updateCue(selectedIndex, { text: e.target.value })}
-            className="editor-cue-input flex-1"
-            placeholder="Caption text…"
-          />
-        </div>
-      )}
-
-      <CaptionTimeline
+      <ClipTimeline
+        timeline={timeline}
         cues={cues}
-        duration={effectiveDuration}
+        duration={rawDuration}
         getCurrentTime={getCurrentTime}
         playing={playing}
-        selectedIndex={selectedIndex}
-        onSelect={setSelectedIndex}
+        selection={selection}
+        onSelect={setSelection}
         onSeek={handleSeek}
         onUpdateCue={updateCue}
+        onTimelineChange={handleTimelineChange}
+        onAddImage={() => void addOverlay("image")}
+        onAddBroll={() => void addOverlay("broll")}
+        onAddMusic={() => void addMusic()}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onStop={handleStop}
+        onMarkIn={handleMarkIn}
+        onMarkOut={handleMarkOut}
+        onSplitAtPlayhead={handleSplitAtPlayhead}
+        videoUrl={videoUrl}
+        mediaUrls={mediaUrls}
       />
     </div>
   );
