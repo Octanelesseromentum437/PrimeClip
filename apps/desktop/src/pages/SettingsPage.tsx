@@ -7,10 +7,12 @@ import {
   getBundleProfile,
   storeApiKey,
 } from "../lib/credentials";
+import { useLocale, type Locale } from "../lib/i18n";
 import { loadProviders, resolveModelForProvider } from "../lib/providers";
 import type { HealthResponse, ProviderDescriptor, ProviderKind } from "../lib/types";
 
 export function SettingsPage() {
+  const { t, locale, setLocale } = useLocale();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providersError, setProvidersError] = useState<string | null>(null);
@@ -93,15 +95,27 @@ export function SettingsPage() {
       <Nav />
       <main className="max-w-2xl mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
           <span className="text-xs uppercase tracking-wide text-app-fg-subtle bg-app-muted px-2 py-1 rounded">
             {bundleProfile} build
           </span>
         </div>
 
+        <section className="card p-4 space-y-3">
+          <h2 className="font-semibold">{t("settings.language")}</h2>
+          <select
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+            className="input"
+          >
+            <option value="en-US">{t("locale.en")}</option>
+            <option value="pt-BR">{t("locale.pt")}</option>
+          </select>
+        </section>
+
         {health && (
           <section className="card p-4 space-y-2">
-            <h2 className="font-semibold">System Status</h2>
+            <h2 className="font-semibold">{t("settings.systemStatus")}</h2>
             {Object.entries(health.dependencies).map(([key, dep]) => (
               <div key={key} className="flex items-center justify-between text-sm">
                 <span>{dep.name}</span>
@@ -114,7 +128,7 @@ export function SettingsPage() {
         )}
 
         <section className="card p-4 space-y-4">
-          <h2 className="font-semibold">LLM Provider</h2>
+          <h2 className="font-semibold">{t("settings.llm")}</h2>
           <select
             value={selectedKind}
             disabled={providersLoading || providers.length === 0}
@@ -178,13 +192,13 @@ export function SettingsPage() {
               onClick={saveKey}
               className="flex-1 btn-primary text-sm"
             >
-              Save
+              {t("settings.save")}
             </button>
             <button
               onClick={runTest}
               className="flex-1 btn-outline"
             >
-              Test Connection
+              {t("settings.test")}
             </button>
           </div>
           {testResult && <p className="text-sm text-muted">{testResult}</p>}
