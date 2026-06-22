@@ -67,6 +67,33 @@ export interface ClipRecord {
   output_path: string | null;
 }
 
+export type CaptionStyleName = "classic" | "podcast" | "reels" | "minimal";
+
+export interface CaptionStyle {
+  font_family: string;
+  font_size: number;
+  primary_color: string;
+  outline_color: string;
+  outline_width: number;
+  alignment: number;
+  margin_v: number;
+  words_per_screen: number;
+  bold: boolean;
+}
+
+export interface CaptionCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface CaptionEditResponse {
+  clip_id: string;
+  cues: CaptionCue[];
+  style: CaptionStyle;
+  preset: CaptionStyleName | null;
+}
+
 export interface DependencyStatus {
   name: string;
   ok: boolean;

@@ -1,4 +1,8 @@
 import type {
+  CaptionEditResponse,
+  CaptionCue,
+  CaptionStyle,
+  CaptionStyleName,
   ClipRecord,
   HealthResponse,
   JobStatus,
@@ -148,4 +152,28 @@ export async function deleteVideo(videoId: string): Promise<void> {
 export async function videoSourceUrl(videoId: string): Promise<string> {
   const base = await resolveApiBase();
   return `${base}/api/videos/${videoId}/source`;
+}
+
+export async function fetchCaptions(clipId: string): Promise<CaptionEditResponse> {
+  return request<CaptionEditResponse>(`/api/clips/${clipId}/captions`);
+}
+
+export async function patchCaptions(
+  clipId: string,
+  patch: {
+    cues?: CaptionCue[];
+    style?: Partial<CaptionStyle>;
+    preset?: CaptionStyleName;
+    words_per_screen?: number;
+  },
+): Promise<CaptionEditResponse> {
+  return request<CaptionEditResponse>(`/api/clips/${clipId}/captions`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function rerenderClip(clipId: string): Promise<{ clip_id: string; status: string }> {
+  return request(`/api/clips/${clipId}/re-render`, { method: "POST" });
 }
