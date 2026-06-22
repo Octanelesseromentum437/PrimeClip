@@ -1,8 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-from sqlmodel import Session
-
 from app.config import Settings, get_settings
 from app.db.models import Job, Video
 from app.db.repository import JobRepository, VideoRepository
@@ -11,6 +9,7 @@ from app.pipelines.clip_pipeline import ClipGenerationPipeline, JobCancelledErro
 from app.pipelines.context import PipelineContext
 from app.schemas.common import JobStatus
 from app.schemas.provider import ProviderConfig, ProviderKind
+from sqlmodel import Session
 
 
 @pytest.mark.asyncio

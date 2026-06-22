@@ -1,16 +1,16 @@
 from app.config import Settings, get_settings
 from app.db.models import Job, Video
 from app.db.repository import JobRepository, VideoRepository
-from app.db.session import init_db
+from app.db.session import get_engine, init_db
 from app.schemas.common import JobStatus
 from sqlmodel import Session
 
 
 def test_cancel_running_job(client, tmp_path, monkeypatch):
     settings = Settings()
-    engine = init_db(settings)
+    init_db(settings)
 
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         video = Video(
             id="v-cancel",
             filename="test.mp4",
@@ -35,7 +35,7 @@ def test_cancel_running_job(client, tmp_path, monkeypatch):
     assert resp.status_code == 200
     assert resp.json()["status"] == JobStatus.CANCELLED.value
 
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         stored = JobRepository(session).get(job_id)
         assert stored is not None
         assert stored.status == JobStatus.CANCELLED.value
@@ -46,9 +46,9 @@ def test_cancel_running_job(client, tmp_path, monkeypatch):
 
 def test_cancel_completed_job_returns_409(client, tmp_path, monkeypatch):
     settings = Settings()
-    engine = init_db(settings)
+    init_db(settings)
 
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         video = Video(
             id="v-cancel",
             filename="test.mp4",
