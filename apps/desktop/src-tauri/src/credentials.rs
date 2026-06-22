@@ -40,6 +40,42 @@ pub fn list_configured_providers() -> Result<Vec<String>, String> {
     Ok(configured)
 }
 
+pub fn store_google_tokens(access_token: &str, refresh_token: Option<&str>) -> Result<(), String> {
+    store_api_key("google_access_token", access_token)?;
+    if let Some(refresh) = refresh_token {
+        store_api_key("google_refresh_token", refresh)?;
+    }
+    Ok(())
+}
+
+pub fn get_google_access_token() -> Result<Option<String>, String> {
+    get_api_key("google_access_token")
+}
+
+pub fn get_google_refresh_token() -> Result<Option<String>, String> {
+    get_api_key("google_refresh_token")
+}
+
+pub fn delete_google_tokens() -> Result<(), String> {
+    delete_api_key("google_access_token")?;
+    delete_api_key("google_refresh_token")
+}
+
+#[tauri::command]
+pub fn store_google_tokens_cmd(access_token: String, refresh_token: Option<String>) -> Result<(), String> {
+    store_google_tokens(&access_token, refresh_token.as_deref())
+}
+
+#[tauri::command]
+pub fn get_google_access_token_cmd() -> Result<Option<String>, String> {
+    get_google_access_token()
+}
+
+#[tauri::command]
+pub fn delete_google_tokens_cmd() -> Result<(), String> {
+    delete_google_tokens()
+}
+
 #[tauri::command]
 pub fn store_api_key_cmd(kind: String, key: String) -> Result<(), String> {
     store_api_key(&kind, &key)

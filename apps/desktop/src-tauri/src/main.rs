@@ -3,8 +3,9 @@ mod sidecar;
 mod state;
 
 use credentials::{
-    delete_api_key_cmd, get_api_base_url, get_api_key_cmd, get_bundle_profile,
-    list_configured_providers_cmd, open_output_folder, store_api_key_cmd,
+    delete_api_key_cmd, delete_google_tokens_cmd, get_api_base_url, get_api_key_cmd,
+    get_bundle_profile, get_google_access_token_cmd, list_configured_providers_cmd,
+    open_output_folder, store_api_key_cmd, store_google_tokens_cmd,
 };
 use sidecar::{SidecarManager, wait_for_api};
 use state::SidecarState;
@@ -46,6 +47,9 @@ fn main() {
             get_api_key_cmd,
             delete_api_key_cmd,
             list_configured_providers_cmd,
+            store_google_tokens_cmd,
+            get_google_access_token_cmd,
+            delete_google_tokens_cmd,
             get_api_base_url,
             get_bundle_profile,
             open_output_folder,

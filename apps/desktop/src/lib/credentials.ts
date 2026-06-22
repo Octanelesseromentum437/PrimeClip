@@ -25,6 +25,24 @@ export async function openOutputFolder(path: string): Promise<void> {
   await invoke("open_output_folder", { path });
 }
 
+export async function storeGoogleTokens(
+  accessToken: string,
+  refreshToken?: string | null,
+): Promise<void> {
+  await invoke("store_google_tokens", {
+    accessToken,
+    refreshToken: refreshToken ?? null,
+  });
+}
+
+export async function getGoogleAccessToken(): Promise<string | null> {
+  return invoke<string | null>("get_google_access_token");
+}
+
+export async function deleteGoogleTokens(): Promise<void> {
+  await invoke("delete_google_tokens");
+}
+
 export async function getBundleProfile(): Promise<string> {
   return invoke<string>("get_bundle_profile");
 }
