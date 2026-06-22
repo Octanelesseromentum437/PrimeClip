@@ -29,6 +29,23 @@ export interface UploadResponse {
   duration_sec: number;
 }
 
+export interface VideoSummary {
+  id: string;
+  filename: string;
+  duration_sec: number;
+  created_at: string;
+  latest_job_status: string | null;
+  latest_job_id: string | null;
+  clip_count: number;
+  source_resolution: string | null;
+}
+
+export interface VideoDetail extends VideoSummary {
+  source_path: string;
+  language: string | null;
+  job_count: number;
+}
+
 export interface JobStatus {
   id: string;
   video_id: string;

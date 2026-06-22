@@ -5,6 +5,8 @@ import type {
   ProviderConfig,
   ProviderDescriptor,
   UploadResponse,
+  VideoDetail,
+  VideoSummary,
 } from "./types";
 
 const DEFAULT_API_BASE = "http://127.0.0.1:8765";
@@ -126,4 +128,24 @@ export async function fetchClips(videoId: string): Promise<ClipRecord[]> {
 export async function clipDownloadUrl(clipId: string): Promise<string> {
   const base = await resolveApiBase();
   return `${base}/api/download/${clipId}`;
+}
+
+export async function fetchVideos(): Promise<VideoSummary[]> {
+  const data = await request<{ videos: VideoSummary[] }>("/api/videos");
+  return data.videos;
+}
+
+export async function fetchVideo(videoId: string): Promise<VideoDetail> {
+  return request<VideoDetail>(`/api/videos/${videoId}`);
+}
+
+export async function deleteVideo(videoId: string): Promise<void> {
+  const base = await resolveApiBase();
+  const resp = await fetch(`${base}/api/videos/${videoId}`, { method: "DELETE" });
+  if (!resp.ok) throw new Error(await resp.text());
+}
+
+export async function videoSourceUrl(videoId: string): Promise<string> {
+  const base = await resolveApiBase();
+  return `${base}/api/videos/${videoId}/source`;
 }
