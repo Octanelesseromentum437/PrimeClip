@@ -3,7 +3,7 @@ from typing import Literal
 
 from app.config import Settings
 from app.infra.dependencies import DependencyResolver
-from app.schemas.transcript import TranscriptSegment
+from app.schemas.transcript import TranscriptSegment, WordSegment
 from faster_whisper import WhisperModel
 
 
@@ -49,6 +49,15 @@ class TranscriptionService:
                     end=seg.end,
                     text=seg.text.strip(),
                     confidence=confidence,
+                    words=[
+                        WordSegment(
+                            word=w.word.strip(),
+                            start=w.start,
+                            end=w.end,
+                        )
+                        for w in (seg.words or [])
+                        if w.word.strip()
+                    ],
                 )
             )
         return segments
