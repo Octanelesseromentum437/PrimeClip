@@ -3,6 +3,7 @@ from app.providers.json_utils import (
     extract_json_array,
     fallback_heuristic_clips,
     parse_clip_candidates,
+    resolve_clip_candidates,
 )
 from app.schemas.clip import ClipCandidate
 from app.schemas.scene import Scene
@@ -37,3 +38,19 @@ def test_fallback_heuristic():
     assert len(clips) >= 1
     for clip in clips:
         assert 30 <= clip.end - clip.start <= 90
+
+
+def test_resolve_clip_candidates_falls_back_on_empty():
+    transcript = [
+        TranscriptSegment(start=0, end=10, text="hello world " * 20, confidence=0.9),
+        TranscriptSegment(start=10, end=60, text="more content " * 50, confidence=0.9),
+    ]
+    scenes = [Scene(start=0, end=120)]
+    clips = resolve_clip_candidates(
+        [],
+        transcript=transcript,
+        scenes=scenes,
+        duration_sec=120,
+        num_clips=2,
+    )
+    assert len(clips) >= 1
