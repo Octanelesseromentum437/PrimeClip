@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ClipCard } from "../components/ClipCard";
 import { JobProgress } from "../components/JobProgress";
 import { Nav } from "../components/Nav";
-import { fetchClips, fetchVideo } from "../lib/api";
+import { cancelJob, fetchClips, fetchVideo } from "../lib/api";
 import { useLocale } from "../lib/i18n";
 import { useJobPolling } from "../hooks/useJobPolling";
 import { patchUploadSession } from "../lib/uploadSession";
@@ -13,10 +14,28 @@ export function ResultsPage() {
   const { videoId } = useParams<{ videoId: string }>();
   const [searchParams] = useSearchParams();
   const jobId = searchParams.get("job");
+  const queryClient = useQueryClient();
   const { data: job } = useJobPolling(jobId, true);
   const [clips, setClips] = useState<ClipRecord[]>([]);
   const [clipsLoading, setClipsLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
   const { t } = useLocale();
+
+  const isActive = job?.status === "running" || job?.status === "queued";
+
+  const handleCancel = async () => {
+    if (!jobId || cancelling) return;
+    setCancelling(true);
+    try {
+      const updated = await cancelJob(jobId);
+      queryClient.setQueryData(["job", jobId], updated);
+      patchUploadSession({ activeGeneration: null });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   useEffect(() => {
     if (!videoId) return;
@@ -28,7 +47,7 @@ export function ResultsPage() {
 
   useEffect(() => {
     if (!videoId || !jobId) return;
-    if (job?.status === "completed" || job?.status === "failed") {
+    if (job?.status === "completed" || job?.status === "failed" || job?.status === "cancelled") {
       patchUploadSession({ activeGeneration: null });
     }
   }, [videoId, jobId, job?.status]);
@@ -51,11 +70,26 @@ export function ResultsPage() {
         <h1 className="text-2xl font-bold">{t("results.title")}</h1>
 
         {job && (
-          <JobProgress
-            progress={job.progress_pct}
-            stage={job.current_stage}
-            status={job.status}
-          />
+          <div className="space-y-3">
+            <JobProgress
+              progress={job.progress_pct}
+              stage={job.current_stage}
+              status={job.status}
+            />
+            {isActive && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="text-sm text-red-600 dark:text-red-400 hover:underline underline-offset-2 disabled:opacity-50"
+              >
+                {cancelling ? t("results.cancelling") : t("results.cancel")}
+              </button>
+            )}
+            {job.status === "cancelled" && (
+              <p className="text-sm text-app-fg-muted">{t("results.cancelled")}</p>
+            )}
+          </div>
         )}
 
         {job?.error_message && (
