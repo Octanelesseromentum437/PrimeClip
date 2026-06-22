@@ -5,7 +5,6 @@ from app.db.session import get_session
 from app.infra.dependencies import DependencyResolver
 from app.infra.ffmpeg import FFmpegService
 from app.infra.storage import FileStore
-from app.jobs.runner import get_job_runner
 from app.providers.registry import ProviderRegistry
 from sqlmodel import Session
 

@@ -12,7 +12,7 @@ from app.infra.storage import FileStore
 from app.pipelines.clip_pipeline import ClipGenerationPipeline
 from app.pipelines.context import PipelineContext
 from app.providers.registry import ProviderRegistry
-from app.schemas.common import JobStatus
+from app.schemas.common import AspectRatio, CaptionStyleName, JobStatus
 from app.schemas.provider import ProviderConfig
 from app.services.captions.generator import CaptionService
 from app.services.face_tracking.mediapipe_tracker import FaceTrackingService
@@ -56,12 +56,10 @@ class JobRunner:
         provider_config: ProviderConfig,
         num_clips: int,
         language: str | None = None,
-        caption_style: "CaptionStyleName | None" = None,
+        caption_style: CaptionStyleName | None = None,
         words_per_screen: int | None = None,
-        aspect_ratio: "AspectRatio | None" = None,
+        aspect_ratio: AspectRatio | None = None,
     ) -> None:
-        from app.schemas.common import CaptionStyleName, AspectRatio
-
         task = asyncio.create_task(
             self._run_job(
                 job_id,
@@ -102,11 +100,10 @@ class JobRunner:
         provider_config: ProviderConfig,
         num_clips: int,
         language: str | None,
-        caption_style: "CaptionStyleName",
+        caption_style: CaptionStyleName,
         words_per_screen: int | None,
-        aspect_ratio: "AspectRatio",
+        aspect_ratio: AspectRatio,
     ) -> None:
-        from app.schemas.common import CaptionStyleName
 
         with Session(get_engine()) as session:
             job_repo = JobRepository(session)

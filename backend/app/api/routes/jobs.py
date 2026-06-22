@@ -1,8 +1,8 @@
-from app.api.deps import get_db_session, get_job_runner
+from app.api.deps import get_db_session
 from app.db.models import Job
 from app.db.repository import JobRepository, VideoRepository
-from app.jobs.runner import JobRunner
-from app.schemas.common import CaptionStyleName, JobStatus, AspectRatio
+from app.jobs.runner import JobRunner, get_job_runner
+from app.schemas.common import AspectRatio, CaptionStyleName, JobStatus
 from app.schemas.provider import ProviderConfig
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
