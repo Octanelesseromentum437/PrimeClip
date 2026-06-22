@@ -1,6 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
 import { ActiveUploadBanner } from "./components/ActiveUploadBanner";
 import { GlobalJobMonitor } from "./components/GlobalJobMonitor";
+import { syncIconShapeFromStorage } from "./lib/iconShape";
 import { LocaleProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
 import { CaptionEditorPage } from "./pages/CaptionEditorPage";
@@ -10,6 +12,10 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { UploadPage } from "./pages/UploadPage";
 
 export default function App() {
+  useEffect(() => {
+    void syncIconShapeFromStorage();
+  }, []);
+
   return (
     <ThemeProvider>
       <LocaleProvider>

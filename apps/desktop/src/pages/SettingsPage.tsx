@@ -7,6 +7,11 @@ import {
   getBundleProfile,
   storeApiKey,
 } from "../lib/credentials";
+import {
+  applyIconShape,
+  readStoredIconShape,
+  type IconShape,
+} from "../lib/iconShape";
 import { useLocale, type Locale } from "../lib/i18n";
 import { loadProviders, resolveModelForProvider } from "../lib/providers";
 import type { HealthResponse, ProviderDescriptor, ProviderKind } from "../lib/types";
@@ -22,6 +27,18 @@ export function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
   const [testResult, setTestResult] = useState<string | null>(null);
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
+  const [iconShape, setIconShape] = useState<IconShape>(() => readStoredIconShape());
+
+  const onIconShapeChange = async (next: IconShape) => {
+    setIconShape(next);
+    try {
+      await applyIconShape(next);
+    } catch {
+      setIconShape(readStoredIconShape());
+    }
+  };
+
+  const iconShapeOptions: IconShape[] = ["square", "rounded", "circle"];
 
   const refreshProviders = useCallback(async () => {
     setProvidersLoading(true);
@@ -111,6 +128,34 @@ export function SettingsPage() {
             <option value="en-US">{t("locale.en")}</option>
             <option value="pt-BR">{t("locale.pt")}</option>
           </select>
+        </section>
+
+        <section className="card p-4 space-y-3">
+          <h2 className="font-semibold">{t("settings.iconShape")}</h2>
+          <p className="text-sm text-app-fg-muted">{t("settings.iconShapeHint")}</p>
+          <div className="grid grid-cols-3 gap-3">
+            {iconShapeOptions.map((shape) => (
+              <button
+                key={shape}
+                type="button"
+                onClick={() => onIconShapeChange(shape)}
+                className={`flex flex-col items-center gap-2 rounded-xl border p-3 transition-colors ${
+                  iconShape === shape
+                    ? "border-brand-600 bg-brand-600/10 ring-2 ring-brand-500/40"
+                    : "border-app-border hover:border-brand-500/60 hover:bg-app-muted"
+                }`}
+              >
+                <img
+                  src={`/icons/${shape}.png`}
+                  alt=""
+                  className={`h-14 w-14 object-contain bg-app-muted ${
+                    shape === "square" ? "rounded-none" : shape === "rounded" ? "rounded-2xl" : "rounded-full"
+                  }`}
+                />
+                <span className="text-xs font-medium">{t(`settings.iconShape.${shape}`)}</span>
+              </button>
+            ))}
+          </div>
         </section>
 
         {health && (
