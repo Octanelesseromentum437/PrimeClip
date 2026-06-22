@@ -183,3 +183,63 @@ export async function patchCaptions(
 export async function rerenderClip(clipId: string): Promise<{ clip_id: string; status: string }> {
   return request(`/api/clips/${clipId}/re-render`, { method: "POST" });
 }
+
+export async function importFromUrl(url: string): Promise<{ import_id: string; status: string }> {
+  return request("/api/upload/url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
+export async function fetchImportStatus(importId: string): Promise<{
+  import_id: string;
+  status: string;
+  progress_pct: number;
+  video_id: string | null;
+  filename: string | null;
+  error_message: string | null;
+}> {
+  return request(`/api/upload/url/${importId}`);
+}
+
+export async function fetchDriveAuthUrl(): Promise<string> {
+  const data = await request<{ url: string }>("/api/drive/auth-url");
+  return data.url;
+}
+
+export async function exchangeDriveCode(code: string): Promise<{
+  access_token: string;
+  refresh_token?: string | null;
+}> {
+  return request("/api/drive/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+}
+
+export async function fetchDriveFiles(accessToken: string): Promise<
+  { id: string; name: string; mime_type: string; size: number | null }[]
+> {
+  const data = await request<{ files: { id: string; name: string; mime_type: string; size: number | null }[] }>(
+    "/api/drive/files",
+    { headers: { "X-Google-Access-Token": accessToken } },
+  );
+  return data.files;
+}
+
+export async function uploadFromDrive(
+  fileId: string,
+  filename: string,
+  accessToken: string,
+): Promise<UploadResponse> {
+  return request<UploadResponse>("/api/upload/drive", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Google-Access-Token": accessToken,
+    },
+    body: JSON.stringify({ file_id: fileId, filename }),
+  });
+}

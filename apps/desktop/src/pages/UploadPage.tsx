@@ -1,18 +1,45 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Nav } from "../components/Nav";
-import { generateClips, uploadVideo, uploadVideoPath } from "../lib/api";
-import { getApiKey } from "../lib/credentials";
+import {
+  exchangeDriveCode,
+  fetchDriveAuthUrl,
+  fetchDriveFiles,
+  fetchImportStatus,
+  generateClips,
+  importFromUrl,
+  uploadFromDrive,
+  uploadVideo,
+  uploadVideoPath,
+} from "../lib/api";
+import {
+  deleteGoogleTokens,
+  getApiKey,
+  getGoogleAccessToken,
+  storeGoogleTokens,
+} from "../lib/credentials";
 import { loadProviders, resolveModelForProvider } from "../lib/providers";
 import { isTauriApp, pickVideoFile } from "../lib/tauri";
-import type { ProviderDescriptor, ProviderKind } from "../lib/types";
+import type { ProviderDescriptor, ProviderKind, UploadResponse } from "../lib/types";
 
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 
+type SourceTab = "file" | "url" | "drive";
+
 export function UploadPage() {
   const navigate = useNavigate();
+  const [sourceTab, setSourceTab] = useState<SourceTab>("file");
   const [file, setFile] = useState<File | null>(null);
   const [localPath, setLocalPath] = useState<string | null>(null);
+  const [importUrl, setImportUrl] = useState("");
+  const [importProgress, setImportProgress] = useState<number | null>(null);
+  const [readyVideo, setReadyVideo] = useState<UploadResponse | null>(null);
+  const [driveToken, setDriveToken] = useState<string | null>(null);
+  const [driveFiles, setDriveFiles] = useState<
+    { id: string; name: string; mime_type: string; size: number | null }[]
+  >([]);
+  const [selectedDriveFileId, setSelectedDriveFileId] = useState<string>("");
+  const [authCode, setAuthCode] = useState("");
   const [providers, setProviders] = useState<ProviderDescriptor[]>([]);
   const [providersError, setProvidersError] = useState<string | null>(null);
   const [providersLoading, setProvidersLoading] = useState(true);
@@ -86,14 +113,101 @@ export function UploadPage() {
     document.getElementById("video-file-input")?.click();
   }, []);
 
-  const selectedLabel = localPath?.split(/[/\\]/).pop() ?? file?.name ?? null;
+  useEffect(() => {
+    refreshProviders();
+    getGoogleAccessToken().then(setDriveToken);
+  }, [refreshProviders]);
+
+  const startDriveAuth = async () => {
+    try {
+      const url = await fetchDriveAuthUrl();
+      window.open(url, "_blank");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google Drive auth unavailable");
+    }
+  };
+
+  const completeDriveAuth = async () => {
+    if (!authCode.trim()) return;
+    try {
+      const tokens = await exchangeDriveCode(authCode.trim());
+      await storeGoogleTokens(tokens.access_token, tokens.refresh_token);
+      setDriveToken(tokens.access_token);
+      setAuthCode("");
+      await refreshDriveFiles(tokens.access_token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google auth failed");
+    }
+  };
+
+  const refreshDriveFiles = async (token?: string) => {
+    const accessToken = token ?? driveToken;
+    if (!accessToken) return;
+    try {
+      const files = await fetchDriveFiles(accessToken);
+      setDriveFiles(files);
+      if (files.length) setSelectedDriveFileId(files[0].id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not list Drive files");
+    }
+  };
+
+  const handleUrlImport = async () => {
+    if (!importUrl.trim()) return;
+    setUploading(true);
+    setError(null);
+    setImportProgress(0);
+    try {
+      const { import_id } = await importFromUrl(importUrl.trim());
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const status = await fetchImportStatus(import_id);
+        setImportProgress(status.progress_pct);
+        if (status.status === "completed" && status.video_id) {
+          setReadyVideo({
+            video_id: status.video_id,
+            filename: status.filename ?? "imported video",
+            duration_sec: 0,
+          });
+          break;
+        }
+        if (status.status === "failed") {
+          throw new Error(status.error_message ?? "Import failed");
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setUploading(false);
+      setImportProgress(null);
+    }
+  };
+
+  const resolveUpload = async (): Promise<UploadResponse> => {
+    if (readyVideo && sourceTab !== "file") return readyVideo;
+    if (sourceTab === "drive") {
+      if (!driveToken || !selectedDriveFileId) throw new Error("Select a Google Drive file");
+      const selected = driveFiles.find((f) => f.id === selectedDriveFileId);
+      return uploadFromDrive(selectedDriveFileId, selected?.name ?? "source.mp4", driveToken);
+    }
+    if (localPath) return uploadVideoPath(localPath);
+    if (file) return uploadVideo(file);
+    throw new Error("No video selected");
+  };
+
+  const canGenerate =
+    sourceTab === "file"
+      ? Boolean(file || localPath)
+      : sourceTab === "url"
+        ? Boolean(readyVideo)
+        : Boolean(driveToken && selectedDriveFileId);
 
   const handleGenerate = async () => {
-    if (!file && !localPath) return;
+    if (!canGenerate) return;
     setUploading(true);
     setError(null);
     try {
-      const upload = localPath ? await uploadVideoPath(localPath) : await uploadVideo(file!);
+      const upload = await resolveUpload();
       const apiKey = selected?.requires_api_key ? await getApiKey(kind) : null;
       const { job_id } = await generateClips(
         upload.video_id,
@@ -119,13 +233,29 @@ export function UploadPage() {
       <main className="max-w-2xl mx-auto p-6 space-y-6">
         <h1 className="text-2xl font-bold">Generate Clips</h1>
 
+        <div className="flex gap-2 text-sm">
+          {(["file", "url", "drive"] as SourceTab[]).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setSourceTab(tab)}
+              className={`px-3 py-1.5 rounded-lg capitalize ${
+                sourceTab === tab ? "bg-brand-600" : "bg-slate-800 hover:bg-slate-700"
+              }`}
+            >
+              {tab === "file" ? "Local file" : tab === "url" ? "URL" : "Google Drive"}
+            </button>
+          ))}
+        </div>
+
+        {sourceTab === "file" && (
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
           className="border-2 border-dashed border-slate-700 rounded-xl p-12 text-center hover:border-brand-500 transition-colors"
         >
-          {selectedLabel ? (
-            <p>{selectedLabel}</p>
+          {(localPath?.split(/[/\\]/).pop() ?? file?.name) ? (
+            <p>{localPath?.split(/[/\\]/).pop() ?? file?.name}</p>
           ) : (
             <p className="text-slate-400">Drag & drop a video, or</p>
           )}
@@ -150,7 +280,97 @@ export function UploadPage() {
               }}
             />
           )}
+          )}
         </div>
+        )}
+
+        {sourceTab === "url" && (
+          <div className="rounded-xl border border-slate-700 p-6 space-y-4">
+            <p className="text-sm text-slate-400">
+              Paste a public YouTube, Vimeo, or Google Drive link. Respect copyright and platform terms.
+            </p>
+            <input
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleUrlImport}
+              disabled={uploading || !importUrl.trim()}
+              className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50"
+            >
+              {uploading ? `Downloading… ${importProgress ?? 0}%` : "Download video"}
+            </button>
+            {readyVideo && (
+              <p className="text-sm text-green-400">Ready: {readyVideo.filename}</p>
+            )}
+          </div>
+        )}
+
+        {sourceTab === "drive" && (
+          <div className="rounded-xl border border-slate-700 p-6 space-y-4">
+            {!driveToken ? (
+              <>
+                <button
+                  type="button"
+                  onClick={startDriveAuth}
+                  className="w-full py-2 rounded-lg bg-slate-700 hover:bg-slate-600"
+                >
+                  Connect Google Drive
+                </button>
+                <input
+                  value={authCode}
+                  onChange={(e) => setAuthCode(e.target.value)}
+                  placeholder="Paste authorization code"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={completeDriveAuth}
+                  className="w-full py-2 rounded-lg bg-brand-600 hover:bg-brand-500"
+                >
+                  Complete sign-in
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => refreshDriveFiles()}
+                    className="px-3 py-1.5 text-sm rounded-lg bg-slate-800"
+                  >
+                    Refresh files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await deleteGoogleTokens();
+                      setDriveToken(null);
+                      setDriveFiles([]);
+                    }}
+                    className="px-3 py-1.5 text-sm rounded-lg text-red-400"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+                <select
+                  value={selectedDriveFileId}
+                  onChange={(e) => setSelectedDriveFileId(e.target.value)}
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-2 text-sm"
+                >
+                  {driveFiles.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="space-y-4">
           <label className="block">
@@ -238,7 +458,7 @@ export function UploadPage() {
 
         <button
           onClick={handleGenerate}
-          disabled={(!file && !localPath) || uploading || providersLoading}
+          disabled={!canGenerate || uploading || providersLoading}
           className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 font-semibold"
         >
           {uploading ? "Processing..." : "Generate Clips"}
