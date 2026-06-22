@@ -11,6 +11,7 @@ from app.api.routes.jobs import router as generate_router
 from app.api.routes.providers import health_router
 from app.api.routes.providers import router as providers_router
 from app.api.routes.upload import router as upload_router
+from app.api.routes.videos import router as videos_router
 from app.config import get_settings
 from app.db.session import init_db
 
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router, prefix="/api")
     app.include_router(upload_router, prefix="/api")
+    app.include_router(videos_router, prefix="/api")
     app.include_router(generate_router, prefix="/api")
     app.include_router(jobs_router, prefix="/api")
     app.include_router(clips_router, prefix="/api")

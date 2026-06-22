@@ -49,3 +49,12 @@ class FileStore:
     def read_json_artifact(self, video_id: str, name: str) -> object:
         path = self.artifact_dir(video_id) / name
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def delete_video_data(self, video_id: str) -> None:
+        for directory in (
+            self.settings.uploads_dir / video_id,
+            self.settings.artifacts_dir / video_id,
+            self.settings.clips_dir / video_id,
+        ):
+            if directory.is_dir():
+                shutil.rmtree(directory, ignore_errors=True)
