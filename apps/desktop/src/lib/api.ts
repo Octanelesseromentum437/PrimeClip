@@ -160,6 +160,11 @@ export async function clipPreviewUrl(clipId: string, resolution?: string): Promi
   return `${base}/api/download/${clipId}/preview${params}`;
 }
 
+export async function clipThumbnailUrl(clipId: string): Promise<string> {
+  const base = await resolveApiBase();
+  return `${base}/api/download/${clipId}/thumbnail`;
+}
+
 export async function fetchSystemFonts(): Promise<string[]> {
   const data = await request<{ fonts: string[] }>("/api/fonts");
   return data.fonts;

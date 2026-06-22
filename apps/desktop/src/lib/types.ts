@@ -65,6 +65,7 @@ export interface ClipRecord {
   reason: string;
   status: string;
   output_path: string | null;
+  thumbnail_path: string | null;
 }
 
 export type CaptionStyleName = "classic" | "podcast" | "reels" | "minimal";
