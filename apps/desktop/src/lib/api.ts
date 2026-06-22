@@ -6,8 +6,10 @@ import type {
   ClipRecord,
   HealthResponse,
   JobStatus,
+  MediaUploadResponse,
   ProviderConfig,
   ProviderDescriptor,
+  TimelineState,
   UploadResponse,
   VideoDetail,
   VideoSummary,
@@ -201,6 +203,7 @@ export async function patchCaptions(
     style?: Partial<CaptionStyle>;
     preset?: CaptionStyleName;
     words_per_screen?: number;
+    timeline?: TimelineState;
   },
 ): Promise<CaptionEditResponse> {
   return request<CaptionEditResponse>(`/api/clips/${clipId}/captions`, {
@@ -208,6 +211,22 @@ export async function patchCaptions(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
+}
+
+export async function uploadEditorMediaLocal(
+  clipId: string,
+  path: string,
+): Promise<MediaUploadResponse> {
+  return request<MediaUploadResponse>(`/api/clips/${clipId}/media/local`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+}
+
+export async function clipMediaUrl(clipId: string, asset: string): Promise<string> {
+  const base = await resolveApiBase();
+  return `${base}/api/clips/${clipId}/media/${encodeURIComponent(asset)}`;
 }
 
 export async function rerenderClip(clipId: string): Promise<{ clip_id: string; status: string }> {
