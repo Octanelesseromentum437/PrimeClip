@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Nav } from "../components/Nav";
+import { VideoPreview, type VideoAspect } from "../components/VideoPreview";
 import {
-  clipDownloadUrl,
+  clipPreviewUrl,
   fetchCaptions,
+  fetchClipQualities,
+  fetchSystemFonts,
   patchCaptions,
   rerenderClip,
 } from "../lib/api";
-import { webVttBlobUrl } from "../lib/webvtt";
+import { formatCueTime, parseCueTime } from "../lib/formatTime";
 import type { CaptionCue, CaptionStyle, CaptionStyleName } from "../lib/types";
 
 const PRESETS: { id: CaptionStyleName; label: string }[] = [
@@ -17,7 +20,7 @@ const PRESETS: { id: CaptionStyleName; label: string }[] = [
   { id: "podcast", label: "Podcast" },
 ];
 
-const FONTS = ["Impact", "Arial", "Helvetica", "Georgia", "Verdana"];
+const FALLBACK_FONTS = ["Impact", "Arial", "Helvetica", "Georgia", "Verdana"];
 
 export function CaptionEditorPage() {
   const { videoId, clipId } = useParams<{ videoId: string; clipId: string }>();
@@ -26,22 +29,33 @@ export function CaptionEditorPage() {
   const [style, setStyle] = useState<CaptionStyle | null>(null);
   const [activePreset, setActivePreset] = useState<CaptionStyleName | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [aspect, setAspect] = useState<VideoAspect>("9:16");
+  const [fonts, setFonts] = useState<string[]>(FALLBACK_FONTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [vttUrl, setVttUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!clipId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchCaptions(clipId);
+      const [data, qualities, systemFonts] = await Promise.all([
+        fetchCaptions(clipId),
+        fetchClipQualities(clipId).catch(() => ({
+          resolutions: ["1080x1920"],
+          aspect_ratio: "9:16",
+        })),
+        fetchSystemFonts().catch(() => FALLBACK_FONTS),
+      ]);
       setCues(data.cues);
       setStyle(data.style);
       setActivePreset(data.preset);
-      setVideoUrl(await clipDownloadUrl(clipId));
+      setAspect(qualities.aspect_ratio === "16:9" ? "16:9" : "9:16");
+      setFonts(systemFonts.length ? systemFonts : FALLBACK_FONTS);
+      const resolution = qualities.resolutions[0];
+      setVideoUrl(`${await clipPreviewUrl(clipId, resolution)}?t=${Date.now()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load captions");
     } finally {
@@ -52,27 +66,6 @@ export function CaptionEditorPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  useEffect(() => {
-    if (vttUrl) URL.revokeObjectURL(vttUrl);
-    const url = webVttBlobUrl(cues);
-    setVttUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [cues]);
-
-  const overlayStyle = useMemo(
-    () =>
-      style
-        ? {
-            fontFamily: style.font_family,
-            fontSize: `${Math.max(14, style.font_size / 4)}px`,
-            color: style.primary_color,
-            fontWeight: style.bold ? 700 : 400,
-            textShadow: `0 0 ${style.outline_width}px ${style.outline_color}, 0 0 ${style.outline_width * 2}px ${style.outline_color}`,
-          }
-        : undefined,
-    [style],
-  );
 
   const updateCue = (index: number, field: keyof CaptionCue, value: string | number) => {
     setCues((prev) =>
@@ -134,7 +127,6 @@ export function CaptionEditorPage() {
     try {
       await patchCaptions(clipId, { cues, style: style ?? undefined });
       await rerenderClip(clipId);
-      setVideoUrl(`${await clipDownloadUrl(clipId)}?t=${Date.now()}`);
       navigate(`/results/${videoId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Re-render failed");
@@ -142,6 +134,11 @@ export function CaptionEditorPage() {
       setRendering(false);
     }
   };
+
+  const fontOptions =
+    style && !fonts.includes(style.font_family)
+      ? [style.font_family, ...fonts]
+      : fonts;
 
   if (loading) {
     return (
@@ -177,35 +174,14 @@ export function CaptionEditorPage() {
             Preview
           </p>
           <div className="flex-1 flex items-center justify-center min-h-0">
-            <div className="relative h-full max-h-full aspect-[9/16] rounded-xl overflow-hidden bg-black shadow-lg ring-1 ring-app-border">
-              {videoUrl && (
-                <>
-                  <video
-                    key={videoUrl}
-                    src={videoUrl}
-                    controls
-                    className="w-full h-full object-contain"
-                  >
-                    {vttUrl && (
-                      <track
-                        kind="captions"
-                        srcLang="en"
-                        label="Preview"
-                        src={vttUrl}
-                        default
-                      />
-                    )}
-                  </video>
-                  {style && (
-                    <div
-                      className="pointer-events-none absolute bottom-8 left-0 right-0 text-center px-4"
-                      style={overlayStyle}
-                    >
-                      {cues.find((c) => c.text)?.text ?? ""}
-                    </div>
-                  )}
-                </>
-              )}
+            <div className="h-full max-h-full w-auto max-w-full">
+              <VideoPreview
+                src={videoUrl}
+                aspect={aspect}
+                cues={cues}
+                style={style}
+                error={error}
+              />
             </div>
           </div>
         </aside>
@@ -224,7 +200,7 @@ export function CaptionEditorPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-app-fg-subtle">Cue {index + 1}</span>
                   <span className="text-xs text-app-fg-muted tabular-nums">
-                    {cue.start.toFixed(1)}s – {cue.end.toFixed(1)}s
+                    {formatCueTime(cue.start)} – {formatCueTime(cue.end)}
                   </span>
                 </div>
                 <textarea
@@ -236,23 +212,33 @@ export function CaptionEditorPage() {
                 />
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <label>
-                    <span className="label-xs">Start (s)</span>
+                    <span className="label-xs">Start</span>
                     <input
-                      type="number"
-                      step={0.1}
-                      value={cue.start}
-                      onChange={(e) => updateCue(index, "start", Number(e.target.value))}
-                      className="input-sm mt-1"
+                      type="text"
+                      inputMode="decimal"
+                      defaultValue={formatCueTime(cue.start)}
+                      key={`${index}-start-${formatCueTime(cue.start)}`}
+                      onBlur={(e) => {
+                        const parsed = parseCueTime(e.target.value);
+                        if (parsed !== null) updateCue(index, "start", parsed);
+                      }}
+                      className="input-sm mt-1 font-mono"
+                      placeholder="0:00.0"
                     />
                   </label>
                   <label>
-                    <span className="label-xs">End (s)</span>
+                    <span className="label-xs">End</span>
                     <input
-                      type="number"
-                      step={0.1}
-                      value={cue.end}
-                      onChange={(e) => updateCue(index, "end", Number(e.target.value))}
-                      className="input-sm mt-1"
+                      type="text"
+                      inputMode="decimal"
+                      defaultValue={formatCueTime(cue.end)}
+                      key={`${index}-end-${formatCueTime(cue.end)}`}
+                      onBlur={(e) => {
+                        const parsed = parseCueTime(e.target.value);
+                        if (parsed !== null) updateCue(index, "end", parsed);
+                      }}
+                      className="input-sm mt-1 font-mono"
+                      placeholder="0:00.0"
                     />
                   </label>
                 </div>
@@ -296,7 +282,7 @@ export function CaptionEditorPage() {
                     onChange={(e) => setStyle({ ...style, font_family: e.target.value })}
                     className="input mt-1"
                   >
-                    {FONTS.map((f) => (
+                    {fontOptions.map((f) => (
                       <option key={f} value={f}>
                         {f}
                       </option>
