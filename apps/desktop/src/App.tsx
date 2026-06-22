@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AppLayout } from "./components/AppLayout";
 import { GlobalJobMonitor } from "./components/GlobalJobMonitor";
 import { MenuBridge } from "./components/MenuBridge";
+import { installPageZoomBlock } from "./lib/blockPageZoom";
 import { syncIconShapeFromStorage } from "./lib/iconShape";
 import { LocaleProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
@@ -16,6 +17,7 @@ import { UploadPage } from "./pages/UploadPage";
 export default function App() {
   useEffect(() => {
     void syncIconShapeFromStorage();
+    return installPageZoomBlock();
   }, []);
 
   return (
