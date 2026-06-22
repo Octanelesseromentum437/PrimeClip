@@ -98,14 +98,54 @@ class UrlImportService:
 
     def _download(self, url: str, output_template: str, progress_hook) -> None:
         import yt_dlp
+        from yt_dlp.utils import DownloadError
+
+        format_attempts = ("bv*+ba/b", "best")
+        last_error: Exception | None = None
+        for fmt in format_attempts:
+            try:
+                ydl_opts = self._build_ydl_opts(output_template, progress_hook, format_selector=fmt)
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+                return
+            except DownloadError as exc:
+                last_error = exc
+                if "403" not in str(exc) or fmt == format_attempts[-1]:
+                    raise
+                logger.warning("yt-dlp got 403 with format %r, retrying with fallback", fmt)
+
+        if last_error:
+            raise last_error
+
+    def _build_ydl_opts(
+        self,
+        output_template: str,
+        progress_hook,
+        *,
+        format_selector: str,
+    ) -> dict:
+        import yt_dlp
 
         ydl_opts: dict = {
-            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "format": format_selector,
+            "merge_output_format": "mp4",
             "outtmpl": output_template,
             "quiet": True,
             "noprogress": True,
             "progress_hooks": [progress_hook],
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["default", "-web_safari"],
+                }
+            },
         }
+
+        js_runtimes = self._detect_js_runtimes()
+        if js_runtimes:
+            ydl_opts["js_runtimes"] = js_runtimes
+        if not self._ejs_available():
+            ydl_opts["remote_components"] = ["ejs:github"]
+
         if self.settings.import_max_duration_sec:
             ydl_opts["match_filter"] = yt_dlp.utils.match_filter_func(
                 f"duration < {self.settings.import_max_duration_sec}"
@@ -113,8 +153,25 @@ class UrlImportService:
         if self.settings.ytdlp_cookies_file:
             ydl_opts["cookiefile"] = self.settings.ytdlp_cookies_file
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+        return ydl_opts
+
+    @staticmethod
+    def _detect_js_runtimes() -> dict[str, dict[str, str | None]]:
+        runtimes: dict[str, dict[str, str | None]] = {}
+        for runtime in ("deno", "node"):
+            path = shutil.which(runtime)
+            if path:
+                runtimes[runtime] = {"path": path}
+        return runtimes
+
+    @staticmethod
+    def _ejs_available() -> bool:
+        import importlib.util
+
+        return importlib.util.find_spec("yt_dlp_ejs") is not None
+
+    def check_js_runtime(self) -> bool:
+        return bool(self._detect_js_runtimes())
 
     def check_available(self) -> bool:
         if self.settings.ytdlp_path:
